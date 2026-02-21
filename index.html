@@ -6,78 +6,45 @@
 <title>レトロこみち 共通ポイント</title>
 
 <style>
-body {
-  font-family: "Helvetica Neue", sans-serif;
-  background: #f8f5f0;
-  text-align: center;
-  padding: 20px;
+body{
+  font-family:sans-serif;
+  background:#f8f5f0;
+  text-align:center;
+  padding:20px;
 }
-
-.card {
-  background: white;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  margin: 20px auto;
-  max-width: 400px;
+.card{
+  background:white;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.1);
+  max-width:400px;
+  margin:20px auto;
 }
-
-button {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 10px;
-  background: #d46a2e;
-  color: white;
-  font-size: 16px;
-  margin-top: 10px;
-  cursor: pointer;
+button{
+  padding:12px 20px;
+  border:none;
+  border-radius:10px;
+  background:#d46a2e;
+  color:white;
+  font-size:16px;
+  cursor:pointer;
 }
-
-input {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  width: 80%;
-  margin-top: 10px;
+input{
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  width:80%;
+  margin-top:10px;
 }
-
-h1 {
-  color: #d46a2e;
-}
-.code {
-  font-size: 36px;
-  letter-spacing: 5px;
-  margin: 15px 0;
+.code{
+  font-size:36px;
+  letter-spacing:5px;
 }
 </style>
 </head>
 <body>
 
-<div class="card" id="main">
-  <h1>レトロこみち</h1>
-  <p>共通ポイント</p>
-  <h2 id="pointDisplay">0 ポイント</h2>
-</div>
-
-<div class="card">
-  <h3>ポイント付与</h3>
-  <input type="number" id="amount" placeholder="購入金額（円）">
-  <button onclick="addPoints('レトロこみち')">ポイント付与</button>
-</div>
-
-<div class="card">
-  <h3>特典利用</h3>
-  <button onclick="usePoints('レトロこみち')">
-    3ポイントで特典利用
-  </button>
-</div>
-
-<div class="card">
-  <h3>管理番号照合（店舗用）</h3>
-  <input id="checkCode" placeholder="例：482A">
-  <button onclick="checkCode()">照合</button>
-  <div id="result"></div>
-</div>
+<div id="app"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -98,108 +65,154 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode");
+const shop = params.get("shop");
+
 let userId = localStorage.getItem("retroUserId");
-if (!userId) {
+if(!userId){
   userId = crypto.randomUUID();
   localStorage.setItem("retroUserId", userId);
 }
 
-async function initUser() {
-  const userRef = doc(db, "users", userId);
+async function initUser(){
+  const userRef = doc(db,"users",userId);
   const snap = await getDoc(userRef);
-  if (!snap.exists()) {
-    await setDoc(userRef, { points: 0 });
+  if(!snap.exists()){
+    await setDoc(userRef,{points:0});
   }
-  updateDisplay();
+}
+await initUser();
+
+function renderHome(){
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <h2>レトロこみち</h2>
+      <p>店舗QRからご利用ください</p>
+    </div>
+  `;
 }
 
-async function updateDisplay() {
-  const userRef = doc(db, "users", userId);
-  const snap = await getDoc(userRef);
-  document.getElementById("pointDisplay").innerText =
-    snap.data().points + " ポイント";
+async function renderAddPage(shop){
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <h3>${shop}</h3>
+      <p>購入金額入力</p>
+      <input type="number" id="amount" placeholder="円">
+      <br><br>
+      <button onclick="addPoints('${shop}')">ポイント付与</button>
+    </div>
+  `;
 }
 
-window.addPoints = async function(shop) {
+window.addPoints = async function(shop){
   const amount = parseInt(document.getElementById("amount").value);
   const addPoint = Math.floor(amount / 300);
 
-  if (!amount || addPoint <= 0) {
-    alert("300円以上からポイント付与できます");
+  if(!amount || addPoint<=0){
+    alert("300円以上から付与可能");
     return;
   }
 
-  const userRef = doc(db, "users", userId);
-  const snap = await getDoc(userRef);
-  const current = snap.data().points;
+  const twelveAgo = Date.now() - (12*60*60*1000);
 
-  await updateDoc(userRef, { points: current + addPoint });
+  const q = query(
+    collection(db,"pointLogs"),
+    where("userId","==",userId),
+    where("shop","==",shop),
+    where("time",">",twelveAgo)
+  );
 
-  await addDoc(collection(db, "pointLogs"), {
-    userId,
-    shop,
-    amount,
-    points: addPoint,
-    time: Date.now()
+  const snap = await getDocs(q);
+  if(!snap.empty){
+    alert("この店舗では12時間以内は付与できません");
+    return;
+  }
+
+  const userRef = doc(db,"users",userId);
+  const userSnap = await getDoc(userRef);
+  const current = userSnap.data().points;
+
+  await updateDoc(userRef,{points:current+addPoint});
+
+  await addDoc(collection(db,"pointLogs"),{
+    userId,shop,amount,
+    points:addPoint,
+    time:Date.now()
   });
 
-  alert(addPoint + "ポイント付与しました");
-  updateDisplay();
+  alert(addPoint+"ポイント付与しました");
+  location.href = location.origin;
 };
 
-window.usePoints = async function(shop) {
-  const userRef = doc(db, "users", userId);
+async function renderUsePage(shop){
+  const userRef = doc(db,"users",userId);
   const snap = await getDoc(userRef);
   const current = snap.data().points;
 
-  if (current < 3) {
-    alert("ポイント不足です");
+  if(current < 3){
+    document.getElementById("app").innerHTML = `
+      <div class="card">
+        <h3>${shop}</h3>
+        <p>ポイント不足です</p>
+      </div>
+    `;
     return;
   }
 
-  const code = Math.floor(100 + Math.random() * 900) +
-    String.fromCharCode(65 + Math.floor(Math.random() * 26));
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <h3>${shop}</h3>
+      <p>この店舗で利用できます</p>
+      <button onclick="usePoints('${shop}')">
+        3ポイントで利用
+      </button>
+    </div>
+  `;
+}
+
+window.usePoints = async function(shop){
+  const userRef = doc(db,"users",userId);
+  const snap = await getDoc(userRef);
+  const current = snap.data().points;
+
+  if(current < 3){
+    alert("ポイント不足");
+    return;
+  }
+
+  const code = Math.floor(100+Math.random()*900)
+              +String.fromCharCode(65+Math.floor(Math.random()*26));
 
   const now = new Date();
-  const timeString = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  const time = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 
-  await updateDoc(userRef, { points: current - 3 });
+  await updateDoc(userRef,{points:current-3});
 
-  await addDoc(collection(db, "uses"), {
-    userId,
-    shop,
-    code,
-    time: timeString,
-    used: true
+  await addDoc(collection(db,"uses"),{
+    userId,shop,code,time,used:true
   });
 
-  document.body.innerHTML = `
+  document.getElementById("app").innerHTML = `
     <div class="card">
       <h2>利用完了</h2>
-      <p>${timeString}</p>
-      <p>3ポイントで特典を利用しました</p>
+      <p>${time}</p>
       <div class="code">${code}</div>
-      <button onclick="location.reload()">ホームへ戻る</button>
+      <p>店舗スタッフへ提示してください</p>
     </div>
   `;
 };
 
-window.checkCode = async function() {
-  const input = document.getElementById("checkCode").value.toUpperCase();
-  const q = query(collection(db, "uses"), where("code", "==", input));
-  const snapshot = await getDocs(q);
+if(mode==="add" && shop){
+  renderAddPage(shop);
+}
+else if(mode==="use" && shop){
+  renderUsePage(shop);
+}
+else{
+  renderHome();
+}
 
-  const result = document.getElementById("result");
-
-  if (!snapshot.empty) {
-    result.innerHTML = "<p style='color:green;'>有効な使用履歴です</p>";
-  } else {
-    result.innerHTML = "<p style='color:red;'>番号が見つかりません</p>";
-  }
-};
-
-initUser();
 </script>
-
 </body>
 </html>
