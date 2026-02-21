@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>店舗ダッシュボード</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+ margin:0;
+ background:#f1f5f9;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+header{
+ background:#0f172a;
+ color:white;
+ padding:16px;
+ font-size:20px;
+ font-weight:bold;
+}
+
+.container{
+ padding:20px;
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+ gap:20px;
+}
+
+.card{
+ background:white;
+ border-radius:16px;
+ padding:20px;
+ box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+input,select{
+ width:100%;
+ padding:10px;
+ border-radius:8px;
+ border:1px solid #ddd;
+ margin-bottom:10px;
+}
+
+button{
+ padding:10px;
+ border:none;
+ border-radius:8px;
+ font-weight:bold;
+ cursor:pointer;
+ margin:3px;
+}
+
+.primary{background:#2563eb;color:white;}
+.gray{background:#64748b;color:white;}
+.danger{background:#dc2626;color:white;}
+
+#dashboard{display:none;}
+</style>
+
+</head>
+<body>
+
+<header>
+店舗ダッシュボード
+</header>
+
+<div class="container">
+
+<div class="card" id="loginCard">
+
+<h3>店舗ログイン</h3>
+
+<input id="shopId" placeholder="ショップID">
+
+<input id="password" type="password" placeholder="パスワード">
+
+<button class="primary" onclick="login()">
+ログイン
+</button>
+
+<div id="loginStatus"></div>
+
+</div>
+
+
+<div id="dashboard">
+
+<div class="card">
+
+<h3>ポイント操作</h3>
+
+<input id="uid" placeholder="ユーザーUID">
+
+<input id="points" type="number" placeholder="ポイント">
+
+<button class="primary" onclick="process('add')">
+付与
+</button>
+
+<button class="gray" onclick="process('use')">
+利用
+</button>
+
+<button class="danger" onclick="process('add_cancel')">
+付与取り消し
+</button>
+
+<button class="danger" onclick="process('use_cancel')">
+利用取り消し
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>絞り込み</h3>
+
+<select id="filterType">
+<option value="">全て</option>
+<option value="add">付与</option>
+<option value="use">利用</option>
+<option value="add_cancel">付与取消</option>
+<option value="use_cancel">利用取消</option>
+</select>
+
+<button class="primary" onclick="loadTransactions()">
+更新
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>グラフ</h3>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+
+<div class="card">
+
+<h3>履歴</h3>
+
+<div id="log"></div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+import {
+ getFirestore,
+ doc,
+ getDoc,
+ setDoc,
+ updateDoc,
+ addDoc,
+ collection,
+ getDocs,
+ query,
+ where,
+ serverTimestamp
+}
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+
+// 自分のFirebase設定に変更
+const firebaseConfig = {
+
+ apiKey: "YOUR_API_KEY",
+
+ authDomain: "YOUR_AUTH_DOMAIN",
+
+ projectId: "YOUR_PROJECT_ID"
+
+};
+
+
+const app = initializeApp(firebaseConfig);
+
+const db = getFirestore(app);
+
+
+let currentShop = null;
+
+let isAdmin = false;
+
+let chart = null;
+
+
+
+// ログイン処理
+window.login = async function(){
+
+ const shopId =
+ document.getElementById("shopId").value;
+
+ const password =
+ document.getElementById("password").value;
+
+
+ if(!shopId || !password){
+
+  alert("入力してください");
+  return;
+
+ }
+
+
+ const shopRef =
+ doc(db,"shops",shopId);
+
+
+ const snap =
+ await getDoc(shopRef);
+
+
+ if(!snap.exists()){
+
+  alert("ショップ不存在");
+  return;
+
+ }
+
+
+ const data = snap.data();
+
+
+ if(data.password !== password){
+
+  alert("パスワード違い");
+  return;
+
+ }
+
+
+ currentShop = shopId;
+
+ isAdmin = (shopId === "admin");
+
+
+ document.getElementById("dashboard").style.display="block";
+
+ document.getElementById("loginStatus").innerHTML =
+ "ログイン成功：" + data.name;
+
+
+ loadTransactions();
+
+}
+
+
+
+// ポイント処理
+window.process = async function(type){
+
+ if(!currentShop){
+
+  alert("ログイン必要");
+  return;
+
+ }
+
+
+ const uid =
+ document.getElementById("uid").value;
+
+
+ const pts =
+ Number(
+ document.getElementById("points").value
+ ) || 0;
+
+
+ if(!uid || pts === 0){
+
+  alert("入力必須");
+  return;
+
+ }
+
+
+ const userRef =
+ doc(db,"users",uid);
+
+
+ const snap =
+ await getDoc(userRef);
+
+
+ let current = 0;
+
+
+ if(!snap.exists()){
+
+  await setDoc(userRef,{
+   points:0
+  });
+
+ }else{
+
+  current =
+  Number(snap.data().points) || 0;
+
+ }
+
+
+ let newPoints = current;
+
+
+ if(type==="add")
+ newPoints += pts;
+
+
+ if(type==="use")
+ newPoints -= pts;
+
+
+ if(type==="add_cancel")
+ newPoints -= pts;
+
+
+ if(type==="use_cancel")
+ newPoints += pts;
+
+
+ await updateDoc(userRef,{
+  points:newPoints
+ });
+
+
+ await addDoc(
+ collection(db,"transactions"),
+ {
+
+  userId:uid,
+
+  shopId:currentShop,
+
+  type:type,
+
+  points:pts,
+
+  createdAt:serverTimestamp()
+
+ }
+ );
+
+
+ alert("完了：" + newPoints + "ポイント");
+
+
+ loadTransactions();
+
+}
+
+
+
+// 履歴読み込み
+async function loadTransactions(){
+
+ if(!currentShop) return;
+
+
+ let q;
+
+
+ if(isAdmin){
+
+  q = query(
+   collection(db,"transactions")
+  );
+
+ }else{
+
+  q = query(
+   collection(db,"transactions"),
+   where("shopId","==",currentShop)
+  );
+
+ }
+
+
+ const typeFilter =
+ document.getElementById("filterType").value;
+
+
+ if(typeFilter){
+
+  q = query(
+   collection(db,"transactions"),
+   where("shopId","==",currentShop),
+   where("type","==",typeFilter)
+  );
+
+ }
+
+
+ const snap =
+ await getDocs(q);
+
+
+ let html = "";
+
+ let total = 0;
+
+
+ snap.forEach(doc=>{
+
+  const d = doc.data();
+
+  const pts =
+  Number(d.points) || 0;
+
+
+  total += pts;
+
+
+  html += `
+  <div style="
+  padding:8px;
+  border-bottom:1px solid #eee;">
+  ${d.type}
+  ：${pts}ポイント
+  </div>
+  `;
+
+ });
+
+
+ document.getElementById("log").innerHTML =
+ html;
+
+
+ updateChart(total);
+
+}
+
+
+
+// グラフ更新
+function updateChart(total){
+
+ const ctx =
+ document.getElementById("chart");
+
+
+ if(chart)
+ chart.destroy();
+
+
+ chart = new Chart(ctx,{
+
+  type:"bar",
+
+  data:{
+
+   labels:["合計ポイント"],
+
+   datasets:[{
+
+    label:"ポイント",
+
+    data:[total]
+
+   }]
+
+  }
+
+ });
+
+}
+
+
+</script>
+
+</body>
+</html>
