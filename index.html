@@ -3,43 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>レトロこみち ポイントイベント</title>
+<title>レトロこみち ポイントサービス</title>
 
 <style>
 body{
   margin:0;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background:#f5f6f8;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#f4f6f8;
   color:#222;
 }
 
-/* 上部残高バー */
+/* 上部バー */
 .topBar{
   background:white;
-  padding:20px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+  padding:18px 20px;
   display:flex;
   justify-content:space-between;
   align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
 }
 
-.balance{
+.balanceBox{
   font-size:28px;
   font-weight:bold;
 }
 
-.balance small{
-  font-size:14px;
+.balanceBox small{
+  font-size:13px;
+  color:#888;
+  display:block;
+}
+
+.adminBtn{
+  background:none;
+  border:none;
+  font-size:18px;
+  cursor:pointer;
   color:#888;
 }
 
-/* セクションカード */
-.sectionCard{
+/* カード */
+.card{
   background:white;
   margin:16px;
   padding:18px;
   border-radius:14px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.04);
+  box-shadow:0 2px 10px rgba(0,0,0,0.05);
 }
 
 .sectionTitle{
@@ -57,7 +66,7 @@ button{
   background:#2d7ef7;
   color:white;
   font-size:15px;
-  margin-top:8px;
+  margin-top:10px;
   cursor:pointer;
 }
 
@@ -66,11 +75,19 @@ button.secondary{
   color:#333;
 }
 
+input,select{
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  margin-top:10px;
+}
+
 /* 履歴 */
 .historyItem{
   display:flex;
   justify-content:space-between;
-  padding:10px 0;
+  padding:8px 0;
   border-bottom:1px solid #eee;
   font-size:14px;
 }
@@ -78,20 +95,37 @@ button.secondary{
 .plus{ color:#2e7d32; }
 .minus{ color:#c62828; }
 
-/* 管理ボタン */
-.adminBtn{
-  font-size:14px;
-  background:none;
-  color:#888;
-  border:none;
-  cursor:pointer;
+/* モーダル */
+.modal{
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+
+.modalContent{
+  background:white;
+  padding:20px;
+  border-radius:14px;
+  width:320px;
+  text-align:center;
+}
+
+.code{
+  font-size:36px;
+  letter-spacing:6px;
+  margin:20px 0;
 }
 </style>
 </head>
+
 <body>
 
 <div id="app"></div>
-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -114,7 +148,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /* 店舗 */
-const shops = {
+const shops={
   shop01:"たこたこ",
   shop02:"こみち食堂",
   shop03:"レトロカフェ"
@@ -124,28 +158,26 @@ const shops = {
 const STAFF_CODE="RETRO2024";
 
 /* ユーザーID */
-let userId = localStorage.getItem("retroUserId");
+let userId=localStorage.getItem("retroUserId");
 if(!userId){
-  userId = crypto.randomUUID();
-  localStorage.setItem("retroUserId", userId);
+  userId=crypto.randomUUID();
+  localStorage.setItem("retroUserId",userId);
 }
 
-/* URL判定 */
-const params = new URLSearchParams(location.search);
-const mode = params.get("mode");
-const shopId = params.get("shop");
+const params=new URLSearchParams(location.search);
+const mode=params.get("mode");
+const shopId=params.get("shop");
 
 /* 初期化 */
 async function init(){
-  const ref = doc(db,"users",userId);
-  const snap = await getDoc(ref);
+  const ref=doc(db,"users",userId);
+  const snap=await getDoc(ref);
 
   if(!snap.exists()){
     await setDoc(ref,{points:0,surveyCompleted:false});
     renderSurvey();
   }else{
-    const data=snap.data();
-    if(!data.surveyCompleted){
+    if(!snap.data().surveyCompleted){
       renderSurvey();
     }else{
       route();
@@ -157,20 +189,18 @@ async function init(){
 function renderSurvey(){
 document.getElementById("app").innerHTML=`
 <div class="card">
-<h2>アンケートにご回答ください</h2>
+<h2>アンケート</h2>
 
-<p>在住エリア</p>
 <select id="area">
-<option value="">選択</option>
+<option value="">在住エリア</option>
 <option>洲本市</option>
 <option>洲本市外</option>
 <option>淡路島内</option>
 <option>淡路島外</option>
 </select>
 
-<p>年代</p>
 <select id="age">
-<option value="">選択</option>
+<option value="">年代</option>
 <option>10代</option>
 <option>20代</option>
 <option>30代</option>
@@ -178,7 +208,6 @@ document.getElementById("app").innerHTML=`
 <option>50代以上</option>
 </select>
 
-<br>
 <button onclick="submitSurvey()">回答して参加する</button>
 </div>`;
 }
@@ -187,7 +216,6 @@ window.submitSurvey=async function(){
 const area=document.getElementById("area").value;
 const age=document.getElementById("age").value;
 if(!area||!age){alert("選択してください");return;}
-
 await updateDoc(doc(db,"users",userId),{
 surveyCompleted:true,
 survey:{area,age,answeredAt:Date.now()}
@@ -195,7 +223,7 @@ survey:{area,age,answeredAt:Date.now()}
 route();
 };
 
-/* ルーティング */
+/* ルート */
 function route(){
 if(mode==="add"&&shopId){renderAdd();}
 else if(mode==="use"&&shopId){renderUse();}
@@ -210,50 +238,40 @@ const points=snap.data().points;
 let historyHTML="";
 const q=query(collection(db,"logs"),where("userId","==",userId));
 const logs=await getDocs(q);
-logs.forEach(docu=>{
-const d=docu.data();
-const time=new Date(d.time).toLocaleString();
-if(d.type==="add"){
-historyHTML+=`<div class="historyItem">＋${d.points}P (${shops[d.shop]}) ${time}</div>`;
+logs.forEach(d=>{
+const data=d.data();
+const time=new Date(data.time).toLocaleString();
+if(data.type==="add"){
+historyHTML+=`<div class="historyItem plus"><span>＋${data.points}P (${shops[data.shop]})</span><span>${time}</span></div>`;
 }
-if(d.type==="use"){
-historyHTML+=`<div class="historyItem">－3P 利用(${shops[d.shop]}) ${time}</div>`;
+if(data.type==="use"){
+historyHTML+=`<div class="historyItem minus"><span>−3P (${shops[data.shop]})</span><span>${time}</span></div>`;
 }
 });
 
 document.getElementById("app").innerHTML=`
 <div class="topBar">
-  <div class="balance">
-    ${points}P<br>
-    <small>現在のポイント</small>
-  </div>
-  <button class="adminBtn" onclick="showAdminLogin()">⚙</button>
+<div class="balanceBox">
+${points}P
+<small>現在のポイント</small>
+</div>
+<button class="adminBtn" onclick="showAdminLogin()">⚙</button>
 </div>
 
-<div class="sectionCard">
-  <div class="sectionTitle">ポイントを貯める</div>
-  <p>店舗QRを読み取ってポイント獲得</p>
-</div>
-
-<div class="sectionCard">
-  <div class="sectionTitle">ポイントを使う</div>
-  <p>3ポイントで特典利用できます</p>
-</div>
-
-<div class="sectionCard">
-  <div class="sectionTitle">履歴</div>
-  ${historyHTML || "履歴はありません"}
+<div class="card">
+<div class="sectionTitle">履歴</div>
+${historyHTML||"履歴はありません"}
 </div>
 `;
+}
 
 /* QR付与 */
 function renderAdd(){
 document.getElementById("app").innerHTML=`
 <div class="card">
 <h2>${shops[shopId]}</h2>
-<input type="number" id="amount" placeholder="金額">
-<br>
-<button onclick="addPoints()">付与</button>
+<input type="number" id="amount" placeholder="金額（円）">
+<button onclick="addPoints()">ポイント付与</button>
 </div>`;
 }
 
@@ -286,11 +304,22 @@ document.getElementById("app").innerHTML=`
 window.usePoints=async function(){
 const ref=doc(db,"users",userId);
 const snap=await getDoc(ref);
-await updateDoc(ref,{points:snap.data().points-3});
+const newTotal=snap.data().points-3;
+await updateDoc(ref,{points:newTotal});
+
+const code=Math.floor(100+Math.random()*900)+
+String.fromCharCode(65+Math.floor(Math.random()*26));
+
 await addDoc(collection(db,"logs"),{
-userId,type:"use",shop:shopId,time:Date.now()
+userId,type:"use",shop:shopId,code,time:Date.now()
 });
-location.href=location.origin;
+
+document.getElementById("app").innerHTML=`
+<div class="card">
+<h2>利用番号</h2>
+<div class="code">${code}</div>
+<button onclick="location.href=location.origin">ホームへ戻る</button>
+</div>`;
 };
 
 /* 管理ログイン */
@@ -299,7 +328,7 @@ document.body.insertAdjacentHTML("beforeend",`
 <div class="modal" id="loginModal">
 <div class="modalContent">
 <h3>関係者コード</h3>
-<input type="password" id="codeInput"><br>
+<input type="password" id="codeInput">
 <button onclick="checkCode()">ログイン</button>
 <button onclick="closeModal()">閉じる</button>
 </div>
@@ -311,20 +340,19 @@ const c=document.getElementById("codeInput").value;
 if(c===STAFF_CODE){
 closeModal();
 showAdminPanel();
-}else{alert("違います");}
+}else{alert("コードが違います");}
 };
 
 window.closeModal=function(){
 document.getElementById("loginModal").remove();
 };
 
-/* 管理パネル */
 window.showAdminPanel=function(){
 document.body.insertAdjacentHTML("beforeend",`
 <div class="modal" id="adminPanel">
 <div class="modalContent">
 <h3>管理メニュー</h3>
-<input type="number" id="manualPoint" placeholder="ポイント数"><br>
+<input type="number" id="manualPoint" placeholder="ポイント数">
 <button onclick="manualAdd()">手動付与</button>
 <button onclick="manualRemove()">手動削除</button>
 <button onclick="resetPoints()">ポイントリセット</button>
