@@ -8,130 +8,83 @@
 <style>
 body{
   margin:0;
-  font-family: "Hiragino Kaku Gothic ProN", sans-serif;
-  background: linear-gradient(135deg,#fdf6e3,#f3e9d2);
-  color:#333;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background:#f5f6f8;
+  color:#222;
 }
 
-/* ヘッダー */
-.hero{
-  background: linear-gradient(90deg,#7b2d26,#c44536);
-  color:white;
-  padding:25px;
-  text-align:center;
-  position:relative;
-  font-size:22px;
-  letter-spacing:2px;
-}
-
-/* 管理ボタン */
-.adminBtn{
-  position:absolute;
-  top:15px;
-  right:15px;
-  background:rgba(255,255,255,0.2);
-  backdrop-filter:blur(5px);
-  border-radius:20px;
-  padding:6px 12px;
-  font-size:14px;
-  border:1px solid rgba(255,255,255,0.3);
-}
-
-/* セクション */
-.section{
-  padding:25px 15px;
-}
-
-/* カード */
-.card{
+/* 上部残高バー */
+.topBar{
   background:white;
-  border-radius:20px;
-  padding:25px;
-  margin:20px auto;
-  max-width:520px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
-  transition:0.3s;
-}
-.card:hover{
-  transform:translateY(-3px);
+  padding:20px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
 
-/* ポイントバッジ */
-.pointCircle{
-  width:140px;
-  height:140px;
-  border-radius:50%;
-  background: radial-gradient(circle,#ffd166,#f4a261);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  margin:0 auto 15px;
+.balance{
   font-size:28px;
   font-weight:bold;
-  color:#7b2d26;
-  box-shadow:0 8px 20px rgba(0,0,0,0.15);
+}
+
+.balance small{
+  font-size:14px;
+  color:#888;
+}
+
+/* セクションカード */
+.sectionCard{
+  background:white;
+  margin:16px;
+  padding:18px;
+  border-radius:14px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.04);
+}
+
+.sectionTitle{
+  font-size:14px;
+  color:#666;
+  margin-bottom:10px;
 }
 
 /* ボタン */
 button{
-  padding:12px 18px;
+  width:100%;
+  padding:14px;
   border:none;
-  border-radius:12px;
-  background:linear-gradient(90deg,#c44536,#e17055);
+  border-radius:10px;
+  background:#2d7ef7;
   color:white;
-  font-weight:bold;
+  font-size:15px;
+  margin-top:8px;
   cursor:pointer;
-  margin:8px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.15);
-  transition:0.2s;
-}
-button:hover{
-  transform:scale(1.05);
 }
 
-/* 入力 */
-select,input{
-  padding:12px;
-  width:80%;
-  border-radius:10px;
-  border:1px solid #ddd;
-  margin-top:10px;
+button.secondary{
+  background:#eee;
+  color:#333;
 }
 
 /* 履歴 */
 .historyItem{
-  text-align:left;
-  padding:8px 0;
-  border-bottom:1px dashed #ccc;
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
   font-size:14px;
 }
 
-/* モーダル */
-.modal{
-  position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
-  background:rgba(0,0,0,0.4);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.modalContent{
-  background:rgba(255,255,255,0.95);
-  backdrop-filter:blur(10px);
-  padding:25px;
-  border-radius:20px;
-  width:320px;
-  text-align:center;
-  box-shadow:0 10px 30px rgba(0,0,0,0.2);
-}
+.plus{ color:#2e7d32; }
+.minus{ color:#c62828; }
 
-/* 利用番号 */
-.code{
-  font-size:40px;
-  letter-spacing:8px;
-  margin:20px 0;
-  color:#c44536;
+/* 管理ボタン */
+.adminBtn{
+  font-size:14px;
+  background:none;
+  color:#888;
+  border:none;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -269,39 +222,29 @@ historyHTML+=`<div class="historyItem">－3P 利用(${shops[d.shop]}) ${time}</d
 });
 
 document.getElementById("app").innerHTML=`
-<div class="hero">
-<h1>レトロこみち ポイントイベント</h1>
-<button class="adminBtn" onclick="showAdminLogin()">⚙</button>
+<div class="topBar">
+  <div class="balance">
+    ${points}P<br>
+    <small>現在のポイント</small>
+  </div>
+  <button class="adminBtn" onclick="showAdminLogin()">⚙</button>
 </div>
 
-<div class="section">
-<div class="card">
-<h2>現在 ${points} ポイント</h2>
-</div>
-</div>
-
-<div class="section">
-<div class="card">
-<h3>開催概要</h3>
-<p>300円ごとに1ポイント</p>
-</div>
+<div class="sectionCard">
+  <div class="sectionTitle">ポイントを貯める</div>
+  <p>店舗QRを読み取ってポイント獲得</p>
 </div>
 
-<div class="section">
-<div class="card">
-<h3>景品紹介</h3>
-<p>3ポイントで各店舗特典</p>
-</div>
+<div class="sectionCard">
+  <div class="sectionTitle">ポイントを使う</div>
+  <p>3ポイントで特典利用できます</p>
 </div>
 
-<div class="section">
-<div class="card">
-<h3>履歴</h3>
-${historyHTML||"履歴なし"}
-</div>
+<div class="sectionCard">
+  <div class="sectionTitle">履歴</div>
+  ${historyHTML || "履歴はありません"}
 </div>
 `;
-}
 
 /* QR付与 */
 function renderAdd(){
