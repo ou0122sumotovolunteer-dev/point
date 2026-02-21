@@ -52,7 +52,7 @@ input{
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { 
   getFirestore, doc, getDoc, setDoc, updateDoc,
-  collection, addDoc, query, where, getDocs
+  collection, addDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -113,26 +113,33 @@ async function renderAddPage(shop){
 }
 
 window.addPoints = async function(shop){
-  const amount = parseInt(document.getElementById("amount").value);
-  const addPoint = Math.floor(amount / 300);
+  const amountInput = document.getElementById("amount").value;
+  const amount = parseInt(amountInput);
 
-  if(!amount || addPoint<=0){
-    alert("300円以上から付与可能");
+  if(!amount || amount < 300){
+    alert("300円以上入力してください");
     return;
   }
 
-  // 12時間制限（同一店舗）
+  const addPoint = Math.floor(amount / 300);
+
+  const logsSnapshot = await getDocs(collection(db,"pointLogs"));
   const twelveAgo = Date.now() - (12*60*60*1000);
 
-  const q = query(
-    collection(db,"pointLogs"),
-    where("userId","==",userId),
-    where("shop","==",shop),
-    where("time",">",twelveAgo)
-  );
+  let blocked = false;
 
-  const check = await getDocs(q);
-  if(!check.empty){
+  logsSnapshot.forEach(docSnap=>{
+    const data = docSnap.data();
+    if(
+      data.userId === userId &&
+      data.shop === shop &&
+      data.time > twelveAgo
+    ){
+      blocked = true;
+    }
+  });
+
+  if(blocked){
     alert("この店舗では12時間以内は再付与できません");
     return;
   }
@@ -140,13 +147,10 @@ window.addPoints = async function(shop){
   const userRef = doc(db,"users",userId);
   const snap = await getDoc(userRef);
   const current = snap.data().points;
-
   const newTotal = current + addPoint;
 
-  // ポイント更新
   await updateDoc(userRef,{points:newTotal});
 
-  // 履歴保存
   await addDoc(collection(db,"pointLogs"),{
     userId,
     shop,
@@ -155,7 +159,6 @@ window.addPoints = async function(shop){
     time:Date.now()
   });
 
-  // ⭐ ここから完了画面
   document.getElementById("app").innerHTML = `
     <div class="card">
       <h2>付与完了</h2>
@@ -187,7 +190,6 @@ async function renderUsePage(shop){
   document.getElementById("app").innerHTML = `
     <div class="card">
       <h3>${shop}</h3>
-      <p>この店舗で利用できます</p>
       <button onclick="usePoints('${shop}')">
         3ポイントで利用
       </button>
@@ -196,7 +198,6 @@ async function renderUsePage(shop){
 }
 
 window.usePoints = async function(shop){
-
   const userRef = doc(db,"users",userId);
   const snap = await getDoc(userRef);
   const current = snap.data().points;
@@ -229,36 +230,11 @@ window.usePoints = async function(shop){
       <p>${time}</p>
       <div class="code">${code}</div>
       <p>店舗スタッフが照合してください</p>
-      <button onclick="location.href=location.origin">ホームへ戻る</button>
+      <button onclick="location.href=location.origin">
+        ホームへ戻る
+      </button>
     </div>
   `;
-};
-
-window.checkCode = async function(){
-  const input = document.getElementById("checkCode").value.toUpperCase();
-  const q = query(collection(db,"uses"),where("code","==",input));
-  const snap = await getDocs(q);
-  const result = document.getElementById("result");
-
-  if(snap.empty){
-    result.innerHTML="<p style='color:red'>番号が見つかりません</p>";
-    return;
-  }
-
-  const docSnap = snap.docs[0];
-  const data = docSnap.data();
-
-  if(data.used===true){
-    result.innerHTML="<p style='color:red'>既に使用済みです</p>";
-    return;
-  }
-
-  await updateDoc(doc(db,"uses",docSnap.id),{
-    used:true,
-    confirmedAt:Date.now()
-  });
-
-  result.innerHTML="<p style='color:green'>使用確定しました</p>";
 };
 
 if(mode==="add" && shop){
