@@ -7,82 +7,138 @@
 
 <style>
 body{
-  font-family:sans-serif;
-  background:#f4f1ea;
   margin:0;
+  font-family: "Hiragino Kaku Gothic ProN", sans-serif;
+  background: linear-gradient(135deg,#fdf6e3,#f3e9d2);
+  color:#333;
 }
+
+/* ヘッダー */
 .hero{
-  background:#c05a2b;
+  background: linear-gradient(90deg,#7b2d26,#c44536);
   color:white;
-  padding:30px;
+  padding:25px;
   text-align:center;
   position:relative;
+  font-size:22px;
+  letter-spacing:2px;
 }
-.section{ padding:25px; }
-.card{
-  background:white;
-  padding:20px;
-  border-radius:16px;
-  box-shadow:0 6px 16px rgba(0,0,0,0.1);
-  max-width:500px;
-  margin:20px auto;
-  text-align:center;
-}
-button{
-  padding:12px 20px;
-  border:none;
-  border-radius:10px;
-  background:#c05a2b;
-  color:white;
-  cursor:pointer;
-  margin:6px;
-}
-select,input{
-  padding:10px;
-  border-radius:8px;
-  width:80%;
-  margin-top:10px;
-}
-.code{
-  font-size:36px;
-  letter-spacing:6px;
-  margin:15px 0;
-}
+
+/* 管理ボタン */
 .adminBtn{
   position:absolute;
-  top:10px;
+  top:15px;
   right:15px;
-  background:#333;
-  font-size:12px;
+  background:rgba(255,255,255,0.2);
+  backdrop-filter:blur(5px);
+  border-radius:20px;
+  padding:6px 12px;
+  font-size:14px;
+  border:1px solid rgba(255,255,255,0.3);
 }
+
+/* セクション */
+.section{
+  padding:25px 15px;
+}
+
+/* カード */
+.card{
+  background:white;
+  border-radius:20px;
+  padding:25px;
+  margin:20px auto;
+  max-width:520px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  transition:0.3s;
+}
+.card:hover{
+  transform:translateY(-3px);
+}
+
+/* ポイントバッジ */
+.pointCircle{
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  background: radial-gradient(circle,#ffd166,#f4a261);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 15px;
+  font-size:28px;
+  font-weight:bold;
+  color:#7b2d26;
+  box-shadow:0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* ボタン */
+button{
+  padding:12px 18px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(90deg,#c44536,#e17055);
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  margin:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  transition:0.2s;
+}
+button:hover{
+  transform:scale(1.05);
+}
+
+/* 入力 */
+select,input{
+  padding:12px;
+  width:80%;
+  border-radius:10px;
+  border:1px solid #ddd;
+  margin-top:10px;
+}
+
+/* 履歴 */
+.historyItem{
+  text-align:left;
+  padding:8px 0;
+  border-bottom:1px dashed #ccc;
+  font-size:14px;
+}
+
+/* モーダル */
 .modal{
   position:fixed;
   top:0; left:0;
   width:100%; height:100%;
-  background:rgba(0,0,0,0.5);
+  background:rgba(0,0,0,0.4);
   display:flex;
   align-items:center;
   justify-content:center;
-  z-index:999;
 }
 .modalContent{
-  background:white;
-  padding:20px;
-  border-radius:12px;
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(10px);
+  padding:25px;
+  border-radius:20px;
   width:320px;
   text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
-.historyItem{
-  font-size:13px;
-  margin:6px 0;
-  border-bottom:1px solid #eee;
-  padding-bottom:4px;
+
+/* 利用番号 */
+.code{
+  font-size:40px;
+  letter-spacing:8px;
+  margin:20px 0;
+  color:#c44536;
 }
 </style>
 </head>
 <body>
 
 <div id="app"></div>
+
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
