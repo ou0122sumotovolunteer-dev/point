@@ -1,18 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
 <title>店舗ダッシュボード</title>
+
+<style>
+body{
+ font-family:sans-serif;
+ background:#f4f1ea;
+ padding:20px;
+}
+.card{
+ background:white;
+ padding:20px;
+ border-radius:12px;
+ max-width:500px;
+ margin:auto;
+}
+</style>
+
 </head>
 <body>
 
-<h2 id="shopName">読み込み中...</h2>
+<div class="card">
+
+<h2 id="shopName"></h2>
+
 <div id="stats"></div>
+
+<h3>履歴</h3>
+<div id="history"></div>
+
+</div>
+
 
 <script type="module">
 
-import { initializeApp } from
-"https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 
 import {
  getFirestore,
@@ -20,14 +45,8 @@ import {
  query,
  where,
  getDocs
-} from
-"https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-
-import {
- getAuth,
- onAuthStateChanged
-} from
-"https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+}
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 
 const firebaseConfig = {
@@ -36,61 +55,92 @@ const firebaseConfig = {
  projectId:"retro-point"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
 
 
-// ログイン状態確認
-onAuthStateChanged(auth, async(user)=>{
+// 店舗パスワード
+const shopPasswords={
+ shop01:"PASS01",
+ shop02:"PASS02",
+ shop03:"PASS03"
+};
 
- if(!user){
-  location.href="login.html";
-  return;
+
+// URL取得
+const params=new URLSearchParams(location.search);
+
+const shop=params.get("shop");
+const code=params.get("code");
+
+
+// 認証
+if(!shopPasswords[shop] || shopPasswords[shop]!=code){
+
+ document.body.innerHTML="<h2>ログイン失敗</h2>";
+ throw "no auth";
+
+}
+
+
+// 店舗名
+const shopNames={
+ shop01:"たこたこ",
+ shop02:"こみち食堂",
+ shop03:"レトロカフェ"
+};
+
+document.getElementById("shopName").innerText=
+ shopNames[shop]+" ダッシュボード";
+
+
+
+// データ取得
+const q=query(
+ collection(db,"logs"),
+ where("shop","==",shop)
+);
+
+const snap=await getDocs(q);
+
+
+let total=0;
+let count=0;
+let history="";
+
+
+snap.forEach(doc=>{
+
+ const d=doc.data();
+
+ if(d.type=="add"){
+  total+=d.points;
+  count++;
  }
 
- const email=user.email;
+ const time=new Date(d.time).toLocaleString();
 
- // shopId決定
- let shopId;
-
- if(email==="shop1@retro.com") shopId="shop01";
- if(email==="shop2@retro.com") shopId="shop02";
-
- loadShopData(shopId);
+ history+=`
+  <div>
+   ${d.type} ${d.points||3}P
+   ${time}
+  </div>
+ `;
 
 });
 
 
-async function loadShopData(shopId){
+document.getElementById("stats").innerHTML=`
 
- document.getElementById("shopName").innerText=shopId;
+<p>付与回数: ${count}</p>
 
- const q=query(
-   collection(db,"logs"),
-   where("shop","==",shopId)
- );
+<p>付与ポイント合計: ${total}</p>
 
- const snap=await getDocs(q);
+`;
 
- let total=0;
- let count=0;
-
- snap.forEach(doc=>{
-  const d=doc.data();
-  if(d.type==="add"){
-   total+=d.points;
-   count++;
-  }
- });
-
- document.getElementById("stats").innerHTML=`
-   <p>付与回数: ${count}</p>
-   <p>付与ポイント合計: ${total}</p>
- `;
-
-}
+document.getElementById("history").innerHTML=history;
 
 </script>
+
 </body>
 </html>
