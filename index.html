@@ -10,7 +10,12 @@ body{
   font-family:sans-serif;
   background:#f4f1ea;
   margin:0;
-  padding:0;
+}
+.hero{
+  background:#c05a2b;
+  color:white;
+  padding:30px;
+  text-align:center;
 }
 .section{
   padding:25px;
@@ -30,24 +35,19 @@ button{
   border-radius:10px;
   background:#c05a2b;
   color:white;
-  font-size:15px;
   cursor:pointer;
   margin:10px;
 }
-select{
+select,input{
   padding:10px;
   border-radius:8px;
   width:80%;
   margin-top:10px;
 }
-h2{
-  margin-top:0;
-}
-.hero{
-  background:#c05a2b;
-  color:white;
-  padding:30px;
-  text-align:center;
+.code{
+  font-size:36px;
+  letter-spacing:6px;
+  margin:15px 0;
 }
 </style>
 </head>
@@ -57,8 +57,10 @@ h2{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc } 
-from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { 
+  getFirestore, doc, getDoc, setDoc, updateDoc,
+  collection, addDoc
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
@@ -71,6 +73,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+const shops = {
+  shop01:"たこたこ",
+  shop02:"こみち食堂",
+  shop03:"レトロカフェ"
+};
+
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode");
+const shopId = params.get("shop");
 
 let userId = localStorage.getItem("retroUserId");
 if(!userId){
@@ -93,39 +105,39 @@ async function initUser(){
     if(!data.surveyCompleted){
       renderSurvey();
     }else{
-      renderHome();
+      route();
     }
   }
 }
 
+/* アンケート */
 function renderSurvey(){
-  document.getElementById("app").innerHTML = `
-    <div class="card">
-      <h2>アンケートにご回答ください</h2>
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <h2>アンケートにご回答ください</h2>
 
-      <p>在住エリア</p>
-      <select id="area">
-        <option value="">選択してください</option>
-        <option>洲本市</option>
-        <option>洲本市外</option>
-        <option>淡路島内</option>
-        <option>淡路島外</option>
-      </select>
+    <p>在住エリア</p>
+    <select id="area">
+      <option value="">選択してください</option>
+      <option>洲本市</option>
+      <option>洲本市外</option>
+      <option>淡路島内</option>
+      <option>淡路島外</option>
+    </select>
 
-      <p>年代</p>
-      <select id="age">
-        <option value="">選択してください</option>
-        <option>10代</option>
-        <option>20代</option>
-        <option>30代</option>
-        <option>40代</option>
-        <option>50代以上</option>
-      </select>
+    <p>年代</p>
+    <select id="age">
+      <option value="">選択してください</option>
+      <option>10代</option>
+      <option>20代</option>
+      <option>30代</option>
+      <option>40代</option>
+      <option>50代以上</option>
+    </select>
 
-      <br>
-      <button onclick="submitSurvey()">回答して参加する</button>
-    </div>
-  `;
+    <br>
+    <button onclick="submitSurvey()">回答して参加する</button>
+  </div>`;
 }
 
 window.submitSurvey = async function(){
@@ -140,68 +152,163 @@ window.submitSurvey = async function(){
   await updateDoc(doc(db,"users",userId),{
     surveyCompleted:true,
     survey:{
-      area:area,
-      age:age,
+      area,
+      age,
       answeredAt:Date.now()
     }
   });
 
-  renderHome();
+  route();
 };
 
+/* ルーティング */
+function route(){
+  if(mode==="add" && shopId){
+    renderAdd();
+  }else if(mode==="use" && shopId){
+    renderUse();
+  }else{
+    renderHome();
+  }
+}
+
+/* ホーム */
 async function renderHome(){
   const snap = await getDoc(doc(db,"users",userId));
   const points = snap.data().points;
 
-  document.getElementById("app").innerHTML = `
-    <div class="hero">
-      <h1>レトロこみち ポイントイベント</h1>
-    </div>
+  document.getElementById("app").innerHTML=`
+  <div class="hero">
+    <h1>レトロこみち ポイントイベント</h1>
+  </div>
 
-    <div class="section">
-      <div class="card">
-        <h2>現在 ${points} ポイント</h2>
-        <p>店舗QRからポイントを貯めてください</p>
-      </div>
+  <div class="section">
+    <div class="card">
+      <h2>現在 ${points} ポイント</h2>
+      <p>店舗QRからポイントを獲得できます</p>
     </div>
+  </div>
 
-    <div class="section">
-      <div class="card">
-        <h2>開催概要</h2>
-        <p>
-        レトロこみち対象店舗でお買い物をすると<br>
-        300円ごとに1ポイント付与。
-        </p>
-      </div>
+  <div class="section">
+    <div class="card">
+      <h2>開催概要</h2>
+      <p>対象店舗で300円ごとに1ポイント付与</p>
     </div>
+  </div>
 
-    <div class="section">
-      <div class="card">
-        <h2>参加方法</h2>
-        <p>
-        ① 対象店舗でお買い物<br>
-        ② 店舗QRを読み取り<br>
-        ③ 金額入力でポイント獲得<br>
-        ④ 3ポイントで特典利用
-        </p>
-      </div>
+  <div class="section">
+    <div class="card">
+      <h2>参加方法</h2>
+      <p>① 店舗QRを読む<br>
+         ② 金額入力<br>
+         ③ ポイント獲得<br>
+         ④ 3ポイントで特典利用</p>
     </div>
+  </div>
 
-    <div class="section">
-      <div class="card">
-        <h2>景品紹介</h2>
-        <p>
-        🎁 たこたこ 100円引き<br>
-        🎁 こみち食堂 トッピング無料<br>
-        🎁 レトロカフェ ドリンク50円引き
-        </p>
-      </div>
+  <div class="section">
+    <div class="card">
+      <h2>景品紹介</h2>
+      <p>🎁 たこたこ 100円引き<br>
+         🎁 こみち食堂 トッピング無料<br>
+         🎁 レトロカフェ ドリンク50円引き</p>
     </div>
-  `;
+  </div>`;
 }
 
-initUser();
+/* 付与 */
+async function renderAdd(){
+  const shopName = shops[shopId];
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <h2>${shopName}</h2>
+    <input type="number" id="amount" placeholder="購入金額（円）">
+    <br>
+    <button onclick="addPoints()">ポイント付与</button>
+  </div>`;
+}
 
+window.addPoints = async function(){
+  const amount = parseInt(document.getElementById("amount").value);
+  if(!amount || amount<300){
+    alert("300円以上入力してください");
+    return;
+  }
+
+  const addPoint = Math.floor(amount/300);
+  const userRef = doc(db,"users",userId);
+  const snap = await getDoc(userRef);
+  const newTotal = snap.data().points + addPoint;
+
+  await updateDoc(userRef,{points:newTotal});
+
+  await addDoc(collection(db,"logs"),{
+    userId,
+    type:"add",
+    shop:shopId,
+    amount,
+    points:addPoint,
+    time:Date.now()
+  });
+
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <h2>付与完了</h2>
+    <p>${addPoint}ポイント獲得</p>
+    <h3>現在 ${newTotal}ポイント</h3>
+    <button onclick="location.href=location.origin">ホームへ</button>
+  </div>`;
+};
+
+/* 利用 */
+async function renderUse(){
+  const snap = await getDoc(doc(db,"users",userId));
+  const current = snap.data().points;
+
+  if(current<3){
+    document.getElementById("app").innerHTML=`
+      <div class="card">
+        <h2>ポイント不足</h2>
+      </div>`;
+    return;
+  }
+
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <button onclick="usePoints()">3ポイントで利用</button>
+  </div>`;
+}
+
+window.usePoints = async function(){
+  const userRef = doc(db,"users",userId);
+  const snap = await getDoc(userRef);
+  const newTotal = snap.data().points-3;
+
+  const code = Math.floor(100+Math.random()*900)
+      +String.fromCharCode(65+Math.floor(Math.random()*26));
+
+  await updateDoc(userRef,{points:newTotal});
+
+  await addDoc(collection(db,"logs"),{
+    userId,
+    type:"use",
+    shop:shopId,
+    code,
+    time:Date.now()
+  });
+
+  const now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <h2>利用番号</h2>
+    <p>${now}</p>
+    <div class="code">${code}</div>
+    <button onclick="location.href=location.origin">ホームへ</button>
+  </div>`;
+};
+
+initUser();
 </script>
 </body>
 </html>
