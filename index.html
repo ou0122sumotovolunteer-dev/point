@@ -16,10 +16,9 @@ body{
   color:white;
   padding:30px;
   text-align:center;
+  position:relative;
 }
-.section{
-  padding:25px;
-}
+.section{ padding:25px; }
 .card{
   background:white;
   padding:20px;
@@ -36,7 +35,7 @@ button{
   background:#c05a2b;
   color:white;
   cursor:pointer;
-  margin:10px;
+  margin:6px;
 }
 select,input{
   padding:10px;
@@ -49,6 +48,36 @@ select,input{
   letter-spacing:6px;
   margin:15px 0;
 }
+.adminBtn{
+  position:absolute;
+  top:10px;
+  right:15px;
+  background:#333;
+  font-size:12px;
+}
+.modal{
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+.modalContent{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  width:320px;
+  text-align:center;
+}
+.historyItem{
+  font-size:13px;
+  margin:6px 0;
+  border-bottom:1px solid #eee;
+  padding-bottom:4px;
+}
 </style>
 </head>
 <body>
@@ -57,11 +86,12 @@ select,input{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { 
+import {
   getFirestore, doc, getDoc, setDoc, updateDoc,
-  collection, addDoc
+  collection, addDoc, getDocs, query, where
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
+/* Firebase設定 */
 const firebaseConfig = {
   apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
   authDomain: "retro-point.firebaseapp.com",
@@ -74,34 +104,38 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+/* 店舗 */
 const shops = {
   shop01:"たこたこ",
   shop02:"こみち食堂",
   shop03:"レトロカフェ"
 };
 
-const params = new URLSearchParams(location.search);
-const mode = params.get("mode");
-const shopId = params.get("shop");
+/* 管理コード */
+const STAFF_CODE="RETRO2024";
 
+/* ユーザーID */
 let userId = localStorage.getItem("retroUserId");
 if(!userId){
   userId = crypto.randomUUID();
   localStorage.setItem("retroUserId", userId);
 }
 
-async function initUser(){
-  const userRef = doc(db,"users",userId);
-  const snap = await getDoc(userRef);
+/* URL判定 */
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode");
+const shopId = params.get("shop");
+
+/* 初期化 */
+async function init(){
+  const ref = doc(db,"users",userId);
+  const snap = await getDoc(ref);
 
   if(!snap.exists()){
-    await setDoc(userRef,{
-      points:0,
-      surveyCompleted:false
-    });
+    await setDoc(ref,{points:0,surveyCompleted:false});
     renderSurvey();
   }else{
-    const data = snap.data();
+    const data=snap.data();
     if(!data.surveyCompleted){
       renderSurvey();
     }else{
@@ -112,203 +146,230 @@ async function initUser(){
 
 /* アンケート */
 function renderSurvey(){
-  document.getElementById("app").innerHTML=`
-  <div class="card">
-    <h2>アンケートにご回答ください</h2>
+document.getElementById("app").innerHTML=`
+<div class="card">
+<h2>アンケートにご回答ください</h2>
 
-    <p>在住エリア</p>
-    <select id="area">
-      <option value="">選択してください</option>
-      <option>洲本市</option>
-      <option>洲本市外</option>
-      <option>淡路島内</option>
-      <option>淡路島外</option>
-    </select>
+<p>在住エリア</p>
+<select id="area">
+<option value="">選択</option>
+<option>洲本市</option>
+<option>洲本市外</option>
+<option>淡路島内</option>
+<option>淡路島外</option>
+</select>
 
-    <p>年代</p>
-    <select id="age">
-      <option value="">選択してください</option>
-      <option>10代</option>
-      <option>20代</option>
-      <option>30代</option>
-      <option>40代</option>
-      <option>50代以上</option>
-    </select>
+<p>年代</p>
+<select id="age">
+<option value="">選択</option>
+<option>10代</option>
+<option>20代</option>
+<option>30代</option>
+<option>40代</option>
+<option>50代以上</option>
+</select>
 
-    <br>
-    <button onclick="submitSurvey()">回答して参加する</button>
-  </div>`;
+<br>
+<button onclick="submitSurvey()">回答して参加する</button>
+</div>`;
 }
 
-window.submitSurvey = async function(){
-  const area = document.getElementById("area").value;
-  const age = document.getElementById("age").value;
+window.submitSurvey=async function(){
+const area=document.getElementById("area").value;
+const age=document.getElementById("age").value;
+if(!area||!age){alert("選択してください");return;}
 
-  if(!area || !age){
-    alert("すべて選択してください");
-    return;
-  }
-
-  await updateDoc(doc(db,"users",userId),{
-    surveyCompleted:true,
-    survey:{
-      area,
-      age,
-      answeredAt:Date.now()
-    }
-  });
-
-  route();
+await updateDoc(doc(db,"users",userId),{
+surveyCompleted:true,
+survey:{area,age,answeredAt:Date.now()}
+});
+route();
 };
 
 /* ルーティング */
 function route(){
-  if(mode==="add" && shopId){
-    renderAdd();
-  }else if(mode==="use" && shopId){
-    renderUse();
-  }else{
-    renderHome();
-  }
+if(mode==="add"&&shopId){renderAdd();}
+else if(mode==="use"&&shopId){renderUse();}
+else{renderHome();}
 }
 
 /* ホーム */
 async function renderHome(){
-  const snap = await getDoc(doc(db,"users",userId));
-  const points = snap.data().points;
+const snap=await getDoc(doc(db,"users",userId));
+const points=snap.data().points;
 
-  document.getElementById("app").innerHTML=`
-  <div class="hero">
-    <h1>レトロこみち ポイントイベント</h1>
-  </div>
+let historyHTML="";
+const q=query(collection(db,"logs"),where("userId","==",userId));
+const logs=await getDocs(q);
+logs.forEach(docu=>{
+const d=docu.data();
+const time=new Date(d.time).toLocaleString();
+if(d.type==="add"){
+historyHTML+=`<div class="historyItem">＋${d.points}P (${shops[d.shop]}) ${time}</div>`;
+}
+if(d.type==="use"){
+historyHTML+=`<div class="historyItem">－3P 利用(${shops[d.shop]}) ${time}</div>`;
+}
+});
 
-  <div class="section">
-    <div class="card">
-      <h2>現在 ${points} ポイント</h2>
-      <p>店舗QRからポイントを獲得できます</p>
-    </div>
-  </div>
+document.getElementById("app").innerHTML=`
+<div class="hero">
+<h1>レトロこみち ポイントイベント</h1>
+<button class="adminBtn" onclick="showAdminLogin()">⚙</button>
+</div>
 
-  <div class="section">
-    <div class="card">
-      <h2>開催概要</h2>
-      <p>対象店舗で300円ごとに1ポイント付与</p>
-    </div>
-  </div>
+<div class="section">
+<div class="card">
+<h2>現在 ${points} ポイント</h2>
+</div>
+</div>
 
-  <div class="section">
-    <div class="card">
-      <h2>参加方法</h2>
-      <p>① 店舗QRを読む<br>
-         ② 金額入力<br>
-         ③ ポイント獲得<br>
-         ④ 3ポイントで特典利用</p>
-    </div>
-  </div>
+<div class="section">
+<div class="card">
+<h3>開催概要</h3>
+<p>300円ごとに1ポイント</p>
+</div>
+</div>
 
-  <div class="section">
-    <div class="card">
-      <h2>景品紹介</h2>
-      <p>🎁 たこたこ 100円引き<br>
-         🎁 こみち食堂 トッピング無料<br>
-         🎁 レトロカフェ ドリンク50円引き</p>
-    </div>
-  </div>`;
+<div class="section">
+<div class="card">
+<h3>景品紹介</h3>
+<p>3ポイントで各店舗特典</p>
+</div>
+</div>
+
+<div class="section">
+<div class="card">
+<h3>履歴</h3>
+${historyHTML||"履歴なし"}
+</div>
+</div>
+`;
 }
 
-/* 付与 */
-async function renderAdd(){
-  const shopName = shops[shopId];
-  document.getElementById("app").innerHTML=`
-  <div class="card">
-    <h2>${shopName}</h2>
-    <input type="number" id="amount" placeholder="購入金額（円）">
-    <br>
-    <button onclick="addPoints()">ポイント付与</button>
-  </div>`;
+/* QR付与 */
+function renderAdd(){
+document.getElementById("app").innerHTML=`
+<div class="card">
+<h2>${shops[shopId]}</h2>
+<input type="number" id="amount" placeholder="金額">
+<br>
+<button onclick="addPoints()">付与</button>
+</div>`;
 }
 
-window.addPoints = async function(){
-  const amount = parseInt(document.getElementById("amount").value);
-  if(!amount || amount<300){
-    alert("300円以上入力してください");
-    return;
-  }
-
-  const addPoint = Math.floor(amount/300);
-  const userRef = doc(db,"users",userId);
-  const snap = await getDoc(userRef);
-  const newTotal = snap.data().points + addPoint;
-
-  await updateDoc(userRef,{points:newTotal});
-
-  await addDoc(collection(db,"logs"),{
-    userId,
-    type:"add",
-    shop:shopId,
-    amount,
-    points:addPoint,
-    time:Date.now()
-  });
-
-  document.getElementById("app").innerHTML=`
-  <div class="card">
-    <h2>付与完了</h2>
-    <p>${addPoint}ポイント獲得</p>
-    <h3>現在 ${newTotal}ポイント</h3>
-    <button onclick="location.href=location.origin">ホームへ</button>
-  </div>`;
+window.addPoints=async function(){
+const amount=parseInt(document.getElementById("amount").value);
+if(!amount||amount<300){alert("300円以上");return;}
+const add=Math.floor(amount/300);
+const ref=doc(db,"users",userId);
+const snap=await getDoc(ref);
+await updateDoc(ref,{points:snap.data().points+add});
+await addDoc(collection(db,"logs"),{
+userId,type:"add",shop:shopId,points:add,time:Date.now()
+});
+location.href=location.origin;
 };
 
-/* 利用 */
+/* QR利用 */
 async function renderUse(){
-  const snap = await getDoc(doc(db,"users",userId));
-  const current = snap.data().points;
-
-  if(current<3){
-    document.getElementById("app").innerHTML=`
-      <div class="card">
-        <h2>ポイント不足</h2>
-      </div>`;
-    return;
-  }
-
-  document.getElementById("app").innerHTML=`
-  <div class="card">
-    <button onclick="usePoints()">3ポイントで利用</button>
-  </div>`;
+const snap=await getDoc(doc(db,"users",userId));
+if(snap.data().points<3){
+document.getElementById("app").innerHTML=`<div class="card"><h2>ポイント不足</h2></div>`;
+return;
+}
+document.getElementById("app").innerHTML=`
+<div class="card">
+<button onclick="usePoints()">3ポイント利用</button>
+</div>`;
 }
 
-window.usePoints = async function(){
-  const userRef = doc(db,"users",userId);
-  const snap = await getDoc(userRef);
-  const newTotal = snap.data().points-3;
-
-  const code = Math.floor(100+Math.random()*900)
-      +String.fromCharCode(65+Math.floor(Math.random()*26));
-
-  await updateDoc(userRef,{points:newTotal});
-
-  await addDoc(collection(db,"logs"),{
-    userId,
-    type:"use",
-    shop:shopId,
-    code,
-    time:Date.now()
-  });
-
-  const now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-
-  document.getElementById("app").innerHTML=`
-  <div class="card">
-    <h2>利用番号</h2>
-    <p>${now}</p>
-    <div class="code">${code}</div>
-    <button onclick="location.href=location.origin">ホームへ</button>
-  </div>`;
+window.usePoints=async function(){
+const ref=doc(db,"users",userId);
+const snap=await getDoc(ref);
+await updateDoc(ref,{points:snap.data().points-3});
+await addDoc(collection(db,"logs"),{
+userId,type:"use",shop:shopId,time:Date.now()
+});
+location.href=location.origin;
 };
 
-initUser();
+/* 管理ログイン */
+window.showAdminLogin=function(){
+document.body.insertAdjacentHTML("beforeend",`
+<div class="modal" id="loginModal">
+<div class="modalContent">
+<h3>関係者コード</h3>
+<input type="password" id="codeInput"><br>
+<button onclick="checkCode()">ログイン</button>
+<button onclick="closeModal()">閉じる</button>
+</div>
+</div>`);
+};
+
+window.checkCode=function(){
+const c=document.getElementById("codeInput").value;
+if(c===STAFF_CODE){
+closeModal();
+showAdminPanel();
+}else{alert("違います");}
+};
+
+window.closeModal=function(){
+document.getElementById("loginModal").remove();
+};
+
+/* 管理パネル */
+window.showAdminPanel=function(){
+document.body.insertAdjacentHTML("beforeend",`
+<div class="modal" id="adminPanel">
+<div class="modalContent">
+<h3>管理メニュー</h3>
+<input type="number" id="manualPoint" placeholder="ポイント数"><br>
+<button onclick="manualAdd()">手動付与</button>
+<button onclick="manualRemove()">手動削除</button>
+<button onclick="resetPoints()">ポイントリセット</button>
+<button onclick="fullReset()">完全初期化</button>
+<button onclick="closePanel()">閉じる</button>
+</div>
+</div>`);
+};
+
+window.closePanel=function(){
+document.getElementById("adminPanel").remove();
+};
+
+window.manualAdd=async function(){
+const val=parseInt(document.getElementById("manualPoint").value);
+const ref=doc(db,"users",userId);
+const snap=await getDoc(ref);
+await updateDoc(ref,{points:snap.data().points+val});
+alert("付与完了");
+};
+
+window.manualRemove=async function(){
+const val=parseInt(document.getElementById("manualPoint").value);
+const ref=doc(db,"users",userId);
+const snap=await getDoc(ref);
+await updateDoc(ref,{points:snap.data().points-val});
+alert("削除完了");
+};
+
+window.resetPoints=async function(){
+await updateDoc(doc(db,"users",userId),{points:0});
+alert("リセット完了");
+};
+
+window.fullReset=async function(){
+await updateDoc(doc(db,"users",userId),{
+points:0,
+surveyCompleted:false
+});
+alert("完全初期化完了");
+location.reload();
+};
+
+init();
 </script>
 </body>
 </html>
