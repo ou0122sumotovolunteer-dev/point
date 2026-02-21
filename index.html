@@ -3,126 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>レトロこみち ポイントサービス</title>
+<title>レトロこみち ポイントイベント</title>
 
 <style>
 body{
+  font-family:sans-serif;
+  background:#f4f1ea;
   margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  background:#f4f6f8;
-  color:#222;
 }
-
-/* 上部バー */
-.topBar{
-  background:white;
-  padding:18px 20px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+.hero{
+  background:#c05a2b;
+  color:white;
+  padding:30px;
+  text-align:center;
+  position:relative;
 }
-
-.balanceBox{
-  font-size:28px;
-  font-weight:bold;
-}
-
-.balanceBox small{
-  font-size:13px;
-  color:#888;
-  display:block;
-}
-
-.adminBtn{
-  background:none;
-  border:none;
-  font-size:18px;
-  cursor:pointer;
-  color:#888;
-}
-
-/* カード */
+.section{ padding:25px; }
 .card{
   background:white;
-  margin:16px;
-  padding:18px;
-  border-radius:14px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.1);
+  max-width:500px;
+  margin:20px auto;
+  text-align:center;
 }
-
-.sectionTitle{
-  font-size:14px;
-  color:#666;
-  margin-bottom:10px;
-}
-
-/* ボタン */
 button{
-  width:100%;
-  padding:14px;
+  padding:12px 20px;
   border:none;
   border-radius:10px;
-  background:#2d7ef7;
+  background:#c05a2b;
   color:white;
-  font-size:15px;
-  margin-top:10px;
   cursor:pointer;
+  margin:6px;
 }
-
-button.secondary{
-  background:#eee;
-  color:#333;
-}
-
-input,select{
-  width:100%;
-  padding:12px;
+select,input{
+  padding:10px;
   border-radius:8px;
-  border:1px solid #ddd;
+  width:80%;
   margin-top:10px;
 }
-
-/* 履歴 */
-.historyItem{
-  display:flex;
-  justify-content:space-between;
-  padding:8px 0;
-  border-bottom:1px solid #eee;
-  font-size:14px;
+.code{
+  font-size:36px;
+  letter-spacing:6px;
+  margin:15px 0;
 }
-
-.plus{ color:#2e7d32; }
-.minus{ color:#c62828; }
-
-/* モーダル */
+.adminBtn{
+  position:absolute;
+  top:10px;
+  right:15px;
+  background:#333;
+  font-size:12px;
+}
 .modal{
   position:fixed;
   top:0; left:0;
   width:100%; height:100%;
-  background:rgba(0,0,0,0.4);
+  background:rgba(0,0,0,0.5);
   display:flex;
   align-items:center;
   justify-content:center;
   z-index:999;
 }
-
 .modalContent{
   background:white;
   padding:20px;
-  border-radius:14px;
+  border-radius:12px;
   width:320px;
   text-align:center;
 }
-
-.code{
-  font-size:36px;
-  letter-spacing:6px;
-  margin:20px 0;
+.historyItem{
+  font-size:13px;
+  margin:6px 0;
+  border-bottom:1px solid #eee;
+  padding-bottom:4px;
 }
 </style>
 </head>
-
 <body>
 
 <div id="app"></div>
@@ -148,7 +105,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /* 店舗 */
-const shops={
+const shops = {
   shop01:"たこたこ",
   shop02:"こみち食堂",
   shop03:"レトロカフェ"
@@ -158,26 +115,28 @@ const shops={
 const STAFF_CODE="RETRO2024";
 
 /* ユーザーID */
-let userId=localStorage.getItem("retroUserId");
+let userId = localStorage.getItem("retroUserId");
 if(!userId){
-  userId=crypto.randomUUID();
-  localStorage.setItem("retroUserId",userId);
+  userId = crypto.randomUUID();
+  localStorage.setItem("retroUserId", userId);
 }
 
-const params=new URLSearchParams(location.search);
-const mode=params.get("mode");
-const shopId=params.get("shop");
+/* URL判定 */
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode");
+const shopId = params.get("shop");
 
 /* 初期化 */
 async function init(){
-  const ref=doc(db,"users",userId);
-  const snap=await getDoc(ref);
+  const ref = doc(db,"users",userId);
+  const snap = await getDoc(ref);
 
   if(!snap.exists()){
     await setDoc(ref,{points:0,surveyCompleted:false});
     renderSurvey();
   }else{
-    if(!snap.data().surveyCompleted){
+    const data=snap.data();
+    if(!data.surveyCompleted){
       renderSurvey();
     }else{
       route();
@@ -189,18 +148,20 @@ async function init(){
 function renderSurvey(){
 document.getElementById("app").innerHTML=`
 <div class="card">
-<h2>アンケート</h2>
+<h2>アンケートにご回答ください</h2>
 
+<p>在住エリア</p>
 <select id="area">
-<option value="">在住エリア</option>
+<option value="">選択</option>
 <option>洲本市</option>
 <option>洲本市外</option>
 <option>淡路島内</option>
 <option>淡路島外</option>
 </select>
 
+<p>年代</p>
 <select id="age">
-<option value="">年代</option>
+<option value="">選択</option>
 <option>10代</option>
 <option>20代</option>
 <option>30代</option>
@@ -208,6 +169,7 @@ document.getElementById("app").innerHTML=`
 <option>50代以上</option>
 </select>
 
+<br>
 <button onclick="submitSurvey()">回答して参加する</button>
 </div>`;
 }
@@ -216,6 +178,7 @@ window.submitSurvey=async function(){
 const area=document.getElementById("area").value;
 const age=document.getElementById("age").value;
 if(!area||!age){alert("選択してください");return;}
+
 await updateDoc(doc(db,"users",userId),{
 surveyCompleted:true,
 survey:{area,age,answeredAt:Date.now()}
@@ -223,7 +186,7 @@ survey:{area,age,answeredAt:Date.now()}
 route();
 };
 
-/* ルート */
+/* ルーティング */
 function route(){
 if(mode==="add"&&shopId){renderAdd();}
 else if(mode==="use"&&shopId){renderUse();}
@@ -238,29 +201,48 @@ const points=snap.data().points;
 let historyHTML="";
 const q=query(collection(db,"logs"),where("userId","==",userId));
 const logs=await getDocs(q);
-logs.forEach(d=>{
-const data=d.data();
-const time=new Date(data.time).toLocaleString();
-if(data.type==="add"){
-historyHTML+=`<div class="historyItem plus"><span>＋${data.points}P (${shops[data.shop]})</span><span>${time}</span></div>`;
+logs.forEach(docu=>{
+const d=docu.data();
+const time=new Date(d.time).toLocaleString();
+if(d.type==="add"){
+historyHTML+=`<div class="historyItem">＋${d.points}P (${shops[d.shop]}) ${time}</div>`;
 }
-if(data.type==="use"){
-historyHTML+=`<div class="historyItem minus"><span>−3P (${shops[data.shop]})</span><span>${time}</span></div>`;
+if(d.type==="use"){
+historyHTML+=`<div class="historyItem">－3P 利用(${shops[d.shop]}) ${time}</div>`;
 }
 });
 
 document.getElementById("app").innerHTML=`
-<div class="topBar">
-<div class="balanceBox">
-${points}P
-<small>現在のポイント</small>
-</div>
+<div class="hero">
+<h1>レトロこみち ポイントイベント</h1>
 <button class="adminBtn" onclick="showAdminLogin()">⚙</button>
 </div>
 
+<div class="section">
 <div class="card">
-<div class="sectionTitle">履歴</div>
-${historyHTML||"履歴はありません"}
+<h2>現在 ${points} ポイント</h2>
+</div>
+</div>
+
+<div class="section">
+<div class="card">
+<h3>開催概要</h3>
+<p>300円ごとに1ポイント</p>
+</div>
+</div>
+
+<div class="section">
+<div class="card">
+<h3>景品紹介</h3>
+<p>3ポイントで各店舗特典</p>
+</div>
+</div>
+
+<div class="section">
+<div class="card">
+<h3>履歴</h3>
+${historyHTML||"履歴なし"}
+</div>
 </div>
 `;
 }
@@ -270,8 +252,9 @@ function renderAdd(){
 document.getElementById("app").innerHTML=`
 <div class="card">
 <h2>${shops[shopId]}</h2>
-<input type="number" id="amount" placeholder="金額（円）">
-<button onclick="addPoints()">ポイント付与</button>
+<input type="number" id="amount" placeholder="金額">
+<br>
+<button onclick="addPoints()">付与</button>
 </div>`;
 }
 
@@ -304,22 +287,11 @@ document.getElementById("app").innerHTML=`
 window.usePoints=async function(){
 const ref=doc(db,"users",userId);
 const snap=await getDoc(ref);
-const newTotal=snap.data().points-3;
-await updateDoc(ref,{points:newTotal});
-
-const code=Math.floor(100+Math.random()*900)+
-String.fromCharCode(65+Math.floor(Math.random()*26));
-
+await updateDoc(ref,{points:snap.data().points-3});
 await addDoc(collection(db,"logs"),{
-userId,type:"use",shop:shopId,code,time:Date.now()
+userId,type:"use",shop:shopId,time:Date.now()
 });
-
-document.getElementById("app").innerHTML=`
-<div class="card">
-<h2>利用番号</h2>
-<div class="code">${code}</div>
-<button onclick="location.href=location.origin">ホームへ戻る</button>
-</div>`;
+location.href=location.origin;
 };
 
 /* 管理ログイン */
@@ -328,7 +300,7 @@ document.body.insertAdjacentHTML("beforeend",`
 <div class="modal" id="loginModal">
 <div class="modalContent">
 <h3>関係者コード</h3>
-<input type="password" id="codeInput">
+<input type="password" id="codeInput"><br>
 <button onclick="checkCode()">ログイン</button>
 <button onclick="closeModal()">閉じる</button>
 </div>
@@ -340,19 +312,20 @@ const c=document.getElementById("codeInput").value;
 if(c===STAFF_CODE){
 closeModal();
 showAdminPanel();
-}else{alert("コードが違います");}
+}else{alert("違います");}
 };
 
 window.closeModal=function(){
 document.getElementById("loginModal").remove();
 };
 
+/* 管理パネル */
 window.showAdminPanel=function(){
 document.body.insertAdjacentHTML("beforeend",`
 <div class="modal" id="adminPanel">
 <div class="modalContent">
 <h3>管理メニュー</h3>
-<input type="number" id="manualPoint" placeholder="ポイント数">
+<input type="number" id="manualPoint" placeholder="ポイント数"><br>
 <button onclick="manualAdd()">手動付与</button>
 <button onclick="manualRemove()">手動削除</button>
 <button onclick="resetPoints()">ポイントリセット</button>
