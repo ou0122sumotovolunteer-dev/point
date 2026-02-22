@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レトロこみち 管理ダッシュボード</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{margin:0;font-family:sans-serif;background:#f6f1e8;}
+header{background:#8b5e3c;color:#fff;padding:15px;font-size:20px;}
+.section{background:#fff;margin:15px;padding:15px;border-radius:10px;}
+button{padding:6px 10px;background:#8b5e3c;color:white;border:none;border-radius:6px;margin:3px;cursor:pointer;}
+button:hover{opacity:0.9;}
+.stat{font-size:20px;font-weight:bold;color:#8b5e3c;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left;}
+.logBox{max-height:200px;overflow:auto;background:#fafafa;padding:5px;font-size:12px;}
+.danger{color:red;font-weight:bold;}
+input,textarea{padding:6px;width:100%;}
+</style>
+</head>
+<body>
+
+<header>レトロこみち 管理ダッシュボード</header>
+
+<div class="section">
+<h3>🚨 不正検知ユーザー</h3>
+<table>
+<thead>
+<tr>
+<th>ユーザーID</th>
+<th>理由</th>
+<th>対応</th>
+</tr>
+</thead>
+<tbody id="fraudTable"></tbody>
+</table>
+</div>
+
+<div class="section">
+<h3>📩 異議申し立て一覧</h3>
+<table>
+<thead>
+<tr>
+<th>ユーザー</th>
+<th>内容</th>
+<th>処理</th>
+</tr>
+</thead>
+<tbody id="appealTable"></tbody>
+</table>
+</div>
+
+<div class="section">
+<h3>💳 ユーザー管理</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>ポイント</th>
+<th>状態</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody id="userTable"></tbody>
+</table>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import {
+getFirestore, collection, getDocs,
+doc, updateDoc
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig={
+apiKey:"ここに本物",
+authDomain:"retro-point.firebaseapp.com",
+projectId:"retro-point"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+
+let usersCache=[];
+let logsCache=[];
+
+async function loadData(){
+
+const usersSnap=await getDocs(collection(db,"users"));
+const logsSnap=await getDocs(collection(db,"logs"));
+
+usersCache=[];
+logsCache=[];
+
+usersSnap.forEach(d=>{
+let data=d.data();
+
+/* 自動停止解除 */
+if(data.status==="banned" && data.banUntil){
+let now=new Date();
+let until=new Date(data.banUntil.seconds*1000);
+if(now>until){
+updateDoc(doc(db,"users",d.id),{status:"active",banReason:"",banUntil:null});
+data.status="active";
+}
+}
+
+usersCache.push({id:d.id,...data});
+});
+
+logsSnap.forEach(d=>logsCache.push({id:d.id,...d.data()}));
+
+renderFraud();
+renderUsers();
+renderAppeals();
+}
+
+function renderFraud(){
+
+let fraudHTML="";
+let userLogMap={};
+
+logsCache.forEach(l=>{
+if(!userLogMap[l.userId]) userLogMap[l.userId]=[];
+userLogMap[l.userId].push(l);
+});
+
+for(let uid in userLogMap){
+let logs=userLogMap[uid];
+
+let adds=logs.filter(x=>x.type==="add"&&x.time?.seconds)
+.sort((a,b)=>a.time.seconds-b.time.seconds);
+
+for(let i=2;i<adds.length;i++){
+if(adds[i].time.seconds-adds[i-2].time.seconds<600){
+fraudHTML+=rowFraud(uid,"短時間大量付与");
+break;
+}
+}
+}
+
+document.getElementById("fraudTable").innerHTML=
+fraudHTML||"<tr><td colspan='3'>異常なし</td></tr>";
+}
+
+function rowFraud(uid,reason){
+return `
+<tr>
+<td>${uid}</td>
+<td class="danger">${reason}</td>
+<td>
+<button onclick="markSafe('${uid}')">問題なし</button>
+<button onclick="markHold('${uid}')">保留</button>
+<button onclick="markBan('${uid}')">利用停止</button>
+</td>
+</tr>`;
+}
+
+/* ===== 状態変更 ===== */
+
+window.markSafe=async(uid)=>{
+await updateDoc(doc(db,"users",uid),{status:"active"});
+alert("問題なしにしました");
+loadData();
+};
+
+window.markHold=async(uid)=>{
+await updateDoc(doc(db,"users",uid),{status:"hold"});
+alert("保留にしました");
+loadData();
+};
+
+window.markBan=async(uid)=>{
+let reason=prompt("停止理由");
+if(!reason) return;
+
+let until=prompt("停止期限 yyyy-mm-dd または 未定");
+
+let value=null;
+if(until && until!=="未定"){
+value=new Date(until);
+}
+
+await updateDoc(doc(db,"users",uid),{
+status:"banned",
+banReason:reason,
+banUntil:value
+});
+
+alert("利用停止しました");
+loadData();
+};
+
+/* ===== ユーザー管理表示 ===== */
+
+function renderUsers(){
+let html="";
+
+usersCache.forEach(u=>{
+html+=`
+<tr>
+<td>${u.id}</td>
+<td>${u.points||0}</td>
+<td>${u.status||"active"}</td>
+<td>
+<button onclick="releaseUser('${u.id}')">解除</button>
+</td>
+</tr>`;
+});
+
+document.getElementById("userTable").innerHTML=html;
+}
+
+window.releaseUser=async(uid)=>{
+await updateDoc(doc(db,"users",uid),{
+status:"active",
+banReason:"",
+banUntil:null
+});
+alert("解除しました");
+loadData();
+};
+
+/* ===== 異議申し立て ===== */
+
+function renderAppeals(){
+let html="";
+
+usersCache.forEach(u=>{
+if(u.appeal && u.appeal.status==="pending"){
+html+=`
+<tr>
+<td>${u.id}</td>
+<td>${u.appeal.message}</td>
+<td>
+<button onclick="approveAppeal('${u.id}')">承認</button>
+<button onclick="rejectAppeal('${u.id}')">却下</button>
+</td>
+</tr>`;
+}
+});
+
+document.getElementById("appealTable").innerHTML=
+html||"<tr><td colspan='3'>なし</td></tr>";
+}
+
+window.approveAppeal=async(uid)=>{
+await updateDoc(doc(db,"users",uid),{
+status:"active",
+appeal:{status:"approved"}
+});
+alert("利用再開");
+loadData();
+};
+
+window.rejectAppeal=async(uid)=>{
+await updateDoc(doc(db,"users",uid),{
+appeal:{status:"rejected"}
+});
+alert("却下しました");
+loadData();
+};
+
+loadData();
+
+</script>
+</body>
+</html>
