@@ -258,17 +258,89 @@ document.getElementById("app").innerHTML=`
 </div>`;
 }
 
-window.addPoints=async function(){
-const amount=parseInt(document.getElementById("amount").value);
-if(!amount||amount<300){alert("300円以上");return;}
-const add=Math.floor(amount/300);
-const ref=doc(db,"users",userId);
-const snap=await getDoc(ref);
-await updateDoc(ref,{points:snap.data().points+add});
-await addDoc(collection(db,"logs"),{
-userId,type:"add",shop:shopId,points:add,time:Date.now()
+window.addPoints = async function(){
+
+const amount =
+parseInt(document.getElementById("amount").value);
+
+if(!amount || amount < 300){
+ alert("300円以上");
+ return;
+}
+
+const add =
+Math.floor(amount / 300);
+
+const ref =
+doc(db,"users",userId);
+
+const snap =
+await getDoc(ref);
+
+const current =
+Number(snap.data()?.points) || 0;
+
+
+// 🔒 12時間制限チェック
+const twelveHours =
+12 * 60 * 60 * 1000;
+
+const now =
+Date.now();
+
+const q =
+query(
+ collection(db,"logs"),
+ where("userId","==",userId),
+ where("shop","==",shopId),
+ where("type","==","add")
+);
+
+const logSnap =
+await getDocs(q);
+
+let blocked = false;
+
+logSnap.forEach(doc=>{
+
+ const time =
+ Number(doc.data().time) || 0;
+
+ if(now - time < twelveHours){
+  blocked = true;
+ }
+
 });
-location.href=location.origin;
+
+if(blocked){
+ alert("この店舗では12時間以内に付与済みです");
+ return;
+}
+
+
+// ポイント付与
+await updateDoc(ref,{
+ points: current + add
+});
+
+
+await addDoc(collection(db,"logs"),{
+
+ userId: userId,
+
+ type: "add",
+
+ shop: shopId,
+
+ points: add,
+
+ time: now
+
+});
+
+
+location.href = location.origin;
+
 };
 
 /* QR利用 */
