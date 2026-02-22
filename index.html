@@ -339,16 +339,46 @@ if(blocked){
 }
 
 /* 付与 */
+
+// 保留チェック
+if(user.status === "hold"){
+  alert("現在保留中のため付与できません");
+  return;
+}
+
+// 停止チェック
+if(user.status === "banned"){
+  if(user.banUntil){
+    const until = new Date(user.banUntil.seconds * 1000);
+    if(new Date() <= until){
+      alert("現在利用停止中です");
+      return;
+    }else{
+      // 期限切れ → 自動解除
+      await updateDoc(ref,{
+        status:"active",
+        banReason:"",
+        banUntil:null
+      });
+    }
+  }else{
+    alert("現在利用停止中です");
+    return;
+  }
+}
+
+// ポイント更新
 await updateDoc(ref,{
- points: current + add
+  points: current + add
 });
 
+// ログ保存
 await addDoc(collection(db,"logs"),{
- userId: userId,
- type: "add",
- shop: shopId,
- points: add,
- time: Timestamp.now()
+  userId: userId,
+  type: "add",
+  shop: shopId,
+  points: add,
+  time: Timestamp.now()
 });
 
 /* 完了画面 */
