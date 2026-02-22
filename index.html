@@ -303,8 +303,31 @@ doc(db,"users",userId);
 const snap =
 await getDoc(ref);
 
+if(!snap.exists()){
+ alert("ユーザーが存在しません");
+ return;
+}
+
+const user = snap.data();   // ★ 追加
+
 const current =
-Number(snap.data()?.points) || 0;
+Number(user.points) || 0;
+
+/* 🔴 ステータス確認 */
+
+const status = user.status || "active";
+
+if(status === "hold"){
+ alert("現在保留中のため付与できません");
+ return;
+}
+
+if(status === "banned"){
+ alert("現在利用停止中です");
+ return;
+}
+
+/* 12時間制限 */
 
 const twelveHours =
 12 * 60 * 60 * 1000;
@@ -326,8 +349,8 @@ await getDocs(q);
 let blocked = false;
 
 logSnap.forEach(doc=>{
-const time =
-doc.data().time?.toMillis() || 0;
+ const time =
+ doc.data().time?.toMillis() || 0;
  if(now - time < twelveHours){
   blocked = true;
  }
@@ -338,25 +361,14 @@ if(blocked){
  return;
 }
 
-/* 付与 */
+/* 🟢 更新 */
 
-// 🔴 先にステータス確認
-if(user.status === "hold"){
-  alert("現在保留中のため付与できません");
-  return;
-}
-
-if(user.status === "banned"){
-  alert("利用停止中です");
-  return;
-}
-
-// 🟢 OKなら更新
 await updateDoc(ref,{
   points: current + add
 });
 
-// 🟢 ログ保存
+/* 🟢 ログ保存 */
+
 await addDoc(collection(db,"logs"),{
   userId: userId,
   type: "add",
@@ -366,6 +378,7 @@ await addDoc(collection(db,"logs"),{
 });
 
 /* 完了画面 */
+
 const timeStr =
 new Date(now).toLocaleString();
 
@@ -381,7 +394,6 @@ document.getElementById("app").innerHTML=`
 </button>
 </div>
 `;
-
 };
 
 /* QR利用 */
