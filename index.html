@@ -217,26 +217,88 @@ else if(mode==="use"&&shopId){renderUse();}
 else{renderHome();}
 }
 
-/* ホーム */
 async function renderHome(){
-const snap=await getDoc(doc(db,"users",userId));
-const points=snap.data().points;
 
-let historyHTML="";
-const q=query(collection(db,"logs"),where("userId","==",userId));
-const logs=await getDocs(q);
-logs.forEach(docu=>{
-const d=docu.data();
-const time = d.time
-  ? new Date(d.time.seconds * 1000).toLocaleString()
-  : "";
-if(d.type==="add"){
-historyHTML+=`<div class="historyItem">＋${d.points}P (${shops[d.shop]}) ${time}</div>`;
+  const snap = await getDoc(doc(db,"users",userId));
+  if(!snap.exists()) return;
+
+  const user = snap.data();
+  const status = user.status || "active";
+
+  // 🔴 利用停止中
+  if(status === "banned"){
+    renderBannedScreen(user);
+    return;
+  }
+
+  const points = user.points || 0;
+
+  let historyHTML = "";
+
+  const q = query(
+    collection(db,"logs"),
+    where("userId","==",userId)
+  );
+
+  const logs = await getDocs(q);
+
+  logs.forEach(docu=>{
+    const d = docu.data();
+    const time = d.time
+      ? new Date(d.time.seconds * 1000).toLocaleString()
+      : "";
+
+    if(d.type === "add"){
+      historyHTML += `
+        <div class="historyItem">
+        ＋${d.points}P (${shops[d.shop]}) ${time}
+        </div>
+      `;
+    }
+
+    if(d.type === "use"){
+      historyHTML += `
+        <div class="historyItem">
+        －3P 利用(${shops[d.shop]}) ${time}
+        </div>
+      `;
+    }
+  });
+
+  document.getElementById("app").innerHTML = `
+  <div class="hero">
+    <h1>レトロこみち ポイントイベント</h1>
+    <button class="adminBtn" onclick="showAdminLogin()">⚙</button>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h2>現在 ${points} ポイント</h2>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h3>開催概要</h3>
+      <p>300円ごとに1ポイント</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h3>景品紹介</h3>
+      <p>3ポイントで各店舗特典</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h3>履歴</h3>
+      ${historyHTML || "履歴なし"}
+    </div>
+  </div>
+  `;
 }
-if(d.type==="use"){
-historyHTML+=`<div class="historyItem">－3P 利用(${shops[d.shop]}) ${time}</div>`;
-}
-});
 
 document.getElementById("app").innerHTML=`
 <div class="hero">
@@ -510,6 +572,27 @@ window.closePanel=function(){
 document.getElementById("adminPanel").remove();
 };
 
+  window.sendAppeal = async function(){
+
+  const msg = document.getElementById("appealMsg").value;
+
+  if(!msg){
+    alert("内容を入力してください");
+    return;
+  }
+
+  await updateDoc(doc(db,"users",userId),{
+    appeal:{
+      message: msg,
+      status: "pending",
+      sentAt: Timestamp.now()
+    }
+  });
+
+  alert("異議を送信しました");
+  location.reload();
+};
+
 window.manualAdd=async function(){
 const val=parseInt(document.getElementById("manualPoint").value);
 const ref=doc(db,"users",userId);
@@ -539,6 +622,31 @@ surveyCompleted:false
 alert("完全初期化完了");
 location.reload();
 };
+
+  function renderBannedScreen(user){
+
+let untilText = "未定";
+
+if(user.banUntil){
+  const until = user.banUntil.seconds
+    ? new Date(user.banUntil.seconds * 1000)
+    : new Date(user.banUntil);
+
+  untilText = until.toLocaleDateString();
+}
+
+document.getElementById("app").innerHTML = `
+<div class="card">
+<h2>利用停止中</h2>
+<p>理由：${user.banReason || "管理者判断"}</p>
+<p>停止期限：${untilText}</p>
+
+<textarea id="appealMsg" placeholder="異議申し立て内容"></textarea>
+<br>
+<button onclick="sendAppeal()">異議を送信</button>
+</div>
+`;
+}
 
 init();
 </script>
