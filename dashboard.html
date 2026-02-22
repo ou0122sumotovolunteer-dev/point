@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>店舗ダッシュボード</title>
+
+<style>
+body{
+  font-family:sans-serif;
+  background:#f4f1ea;
+  margin:0;
+}
+.header{
+  background:#c05a2b;
+  color:white;
+  padding:20px;
+  text-align:center;
+}
+.section{
+  padding:20px;
+}
+.card{
+  background:white;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.1);
+  max-width:600px;
+  margin:20px auto;
+}
+h2{
+  margin-top:0;
+}
+.stat{
+  font-size:22px;
+  margin:10px 0;
+}
+.historyItem{
+  font-size:13px;
+  margin:6px 0;
+  border-bottom:1px solid #eee;
+  padding-bottom:4px;
+}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import {
+  getFirestore, collection, getDocs, query, where
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
+  authDomain: "retro-point.firebaseapp.com",
+  projectId: "retro-point",
+  storageBucket: "retro-point.firebasestorage.app",
+  messagingSenderId: "522866949412",
+  appId: "1:522866949412:web:47ae009c10fa2ae14707b1"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const shops = {
+  shop01: "ほたるの宿",
+  shop02: "たこたこ",
+  shop03: "starbase",
+  shop04: "ケイズ トラベル プラン",
+  shop05: "サン美容室",
+  shop06: "HELLO PANDA",
+  shop07: "ETHICA",
+  shop08: "ajuga",
+  shop09: "フクスケ亭",
+  shop10: "めだか屋福助亭",
+  shop11: "ＰＵＲＡＲＥ：",
+  shop12: "オリオン",
+  shop13: "なべ秀陶器店 幸町店",
+  shop14: "ぴかいちこみち",
+  shop15: "こみち食堂",
+  shop16: "ソラノアカリ カラコルム",
+  shop17: "hugne.",
+  shop18: "freestars",
+  shop19: "洲本家",
+  shop20: "陶koubou m",
+  shop21: "チャルラール",
+  shop22: "第八戎丸",
+  shop23: "La Ruelle.",
+  shop24: "バーエトワール",
+  shop25: "coffe and bake stand pegasus"
+};
+
+const params = new URLSearchParams(location.search);
+const shopId = params.get("shop");
+
+if(!shopId || !shops[shopId]){
+  document.getElementById("app").innerHTML =
+  "<div class='card'><h2>店舗指定エラー</h2></div>";
+}else{
+  loadDashboard();
+}
+
+async function loadDashboard(){
+
+  const q = query(
+    collection(db,"logs"),
+    where("shop","==",shopId)
+  );
+
+  const snap = await getDocs(q);
+
+  let totalAdd = 0;
+  let totalUse = 0;
+  let historyHTML = "";
+
+  snap.forEach(doc=>{
+    const d = doc.data();
+
+    if(d.type === "add"){
+      totalAdd += d.points || 0;
+    }
+
+    if(d.type === "use"){
+      totalUse += 1;
+    }
+
+    const time = d.time
+      ? new Date(d.time.seconds * 1000).toLocaleString()
+      : "";
+
+    historyHTML += `
+      <div class="historyItem">
+      ${d.type === "add" ? "＋" + d.points + "P" : "－3P"}
+      (${time})
+      </div>
+    `;
+  });
+
+  document.getElementById("app").innerHTML = `
+  <div class="header">
+    <h1>${shops[shopId]} ダッシュボード</h1>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h2>統計</h2>
+      <div class="stat">総付与ポイント：${totalAdd} P</div>
+      <div class="stat">総利用回数：${totalUse} 回</div>
+    </div>
+
+    <div class="card">
+      <h2>履歴</h2>
+      ${historyHTML || "履歴なし"}
+    </div>
+  </div>
+  `;
+}
+</script>
+
+</body>
+</html>
