@@ -90,6 +90,11 @@ import {
   getFirestore, doc, getDoc, setDoc, updateDoc,
   collection, addDoc, getDocs, query, where
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+  import {
+  getFirestore, doc, getDoc, setDoc, updateDoc,
+  collection, addDoc, getDocs, query, where,
+  Timestamp
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 /* Firebase設定 */
 const firebaseConfig = {
@@ -322,8 +327,8 @@ await getDocs(q);
 let blocked = false;
 
 logSnap.forEach(doc=>{
- const time =
- Number(doc.data().time) || 0;
+const time =
+doc.data().time?.toMillis() || 0;
  if(now - time < twelveHours){
   blocked = true;
  }
@@ -344,7 +349,7 @@ await addDoc(collection(db,"logs"),{
  type: "add",
  shop: shopId,
  points: add,
- time: now
+ time: Timestamp.now()
 });
 
 /* 完了画面 */
@@ -418,12 +423,12 @@ await addDoc(collection(db,"logs"),{
  userId:userId,
  type:"use",
  shop:shopId,
- time:now,
- useCode:code
+ time: Timestamp.now(),
+useCode: code
 });
 
 const timeStr=
-new Date(now).toLocaleString();
+new Date(d.time.seconds * 1000).toLocaleString()
 
 document.getElementById("app").innerHTML=`
 <div class="card">
