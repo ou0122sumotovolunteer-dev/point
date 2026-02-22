@@ -300,40 +300,7 @@ async function renderHome(){
   `;
 }
 
-document.getElementById("app").innerHTML=`
-<div class="hero">
-<h1>レトロこみち ポイントイベント</h1>
-<button class="adminBtn" onclick="showAdminLogin()">⚙</button>
-</div>
 
-<div class="section">
-<div class="card">
-<h2>現在 ${points} ポイント</h2>
-</div>
-</div>
-
-<div class="section">
-<div class="card">
-<h3>開催概要</h3>
-<p>300円ごとに1ポイント</p>
-</div>
-</div>
-
-<div class="section">
-<div class="card">
-<h3>景品紹介</h3>
-<p>3ポイントで各店舗特典</p>
-</div>
-</div>
-
-<div class="section">
-<div class="card">
-<h3>履歴</h3>
-${historyHTML||"履歴なし"}
-</div>
-</div>
-`;
-}
 
 /* QR付与 */
 function renderAdd(){
