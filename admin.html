@@ -2,497 +2,166 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>店舗ダッシュボード</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理ダッシュボード</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{
- margin:0;
- background:#f1f5f9;
- font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-
-header{
- background:#0f172a;
- color:white;
- padding:16px;
- font-size:20px;
- font-weight:bold;
-}
-
-.container{
- padding:20px;
- display:grid;
- grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
- gap:20px;
-}
-
-.card{
- background:white;
- border-radius:16px;
- padding:20px;
- box-shadow:0 10px 30px rgba(0,0,0,0.08);
-}
-
-input,select{
- width:100%;
- padding:10px;
- border-radius:8px;
- border:1px solid #ddd;
- margin-bottom:10px;
-}
-
-button{
- padding:10px;
- border:none;
- border-radius:8px;
- font-weight:bold;
- cursor:pointer;
- margin:3px;
-}
-
-.primary{background:#2563eb;color:white;}
-.gray{background:#64748b;color:white;}
-.danger{background:#dc2626;color:white;}
-
-#dashboard{display:none;}
+body{margin:0;font-family:sans-serif;background:#f6f1e8;}
+header{background:#8b5e3c;color:#fff;padding:15px;font-size:18px;}
+.section{background:#fff;margin:15px;padding:15px;border-radius:10px;}
+h2{margin-top:0;}
+.stat{font-size:22px;font-weight:bold;color:#8b5e3c;}
+input{padding:10px;width:200px;}
+button{padding:8px 12px;background:#8b5e3c;color:white;border:none;border-radius:6px;}
+table{width:100%;border-collapse:collapse;}
+td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left;}
+.alert{color:red;font-weight:bold;}
 </style>
-
 </head>
 <body>
 
-<header>
-店舗ダッシュボード
-</header>
+<header>レトロこみち 管理ダッシュボード</header>
 
-<div class="container">
-
-<div class="card" id="loginCard">
-
-<h3>店舗ログイン</h3>
-
-<input id="shopId" placeholder="ショップID">
-
-<input id="password" type="password" placeholder="パスワード">
-
-<button class="primary" onclick="login()">
-ログイン
-</button>
-
-<div id="loginStatus"></div>
-
+<div class="section">
+<h2>📈 全体統計</h2>
+<div>総参加人数：<span id="totalUsers" class="stat">0</span></div>
+<div>総ポイント発行数：<span id="totalIssued" class="stat">0</span></div>
+<div>総利用回数：<span id="totalUsed" class="stat">0</span></div>
 </div>
 
-
-<div id="dashboard">
-
-<div class="card">
-
-<h3>ポイント操作</h3>
-
-<input id="uid" placeholder="ユーザーUID">
-
-<input id="points" type="number" placeholder="ポイント">
-
-<button class="primary" onclick="process('add')">
-付与
-</button>
-
-<button class="gray" onclick="process('use')">
-利用
-</button>
-
-<button class="danger" onclick="process('add_cancel')">
-付与取り消し
-</button>
-
-<button class="danger" onclick="process('use_cancel')">
-利用取り消し
-</button>
-
+<div class="section">
+<h2>🧑‍🤝‍🧑 アンケート集計</h2>
+<div>洲本市割合：<span id="sumotoRate" class="stat">0%</span></div>
+<canvas id="ageChart"></canvas>
 </div>
 
-
-<div class="card">
-
-<h3>絞り込み</h3>
-
-<select id="filterType">
-<option value="">全て</option>
-<option value="add">付与</option>
-<option value="use">利用</option>
-<option value="add_cancel">付与取消</option>
-<option value="use_cancel">利用取消</option>
-</select>
-
-<button class="primary" onclick="loadTransactions()">
-更新
-</button>
-
+<div class="section">
+<h2>🏪 店舗別集計</h2>
+<table>
+<thead><tr><th>店舗</th><th>付与数</th><th>利用数</th></tr></thead>
+<tbody id="shopTable"></tbody>
+</table>
 </div>
 
-
-<div class="card">
-
-<h3>グラフ</h3>
-
-<canvas id="chart"></canvas>
-
+<div class="section">
+<h2>🚨 不正検知</h2>
+<div id="fraudArea"></div>
 </div>
 
-
-<div class="card">
-
-<h3>履歴</h3>
-
-<div id="log"></div>
-
+<div class="section">
+<h2>🧾 利用コード照合</h2>
+<input id="codeInput" placeholder="利用コード">
+<button onclick="checkCode()">確認</button>
+<div id="codeResult"></div>
 </div>
-
-</div>
-
-</div>
-
 
 <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getFirestore, collection, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-import { initializeApp }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+const firebaseConfig={/* 同じ設定 */};
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
 
-import {
- getFirestore,
- doc,
- getDoc,
- setDoc,
- updateDoc,
- addDoc,
- collection,
- getDocs,
- query,
- where,
- serverTimestamp
+async function loadDashboard(){
+
+const usersSnap=await getDocs(collection(db,"users"));
+const logsSnap=await getDocs(collection(db,"logs"));
+
+let totalUsers=usersSnap.size;
+let totalIssued=0;
+let totalUsed=0;
+
+let areaCount=0;
+let sumotoCount=0;
+
+let ageMap={};
+let shopMap={};
+let fraudMap={};
+
+logsSnap.forEach(docu=>{
+let d=docu.data();
+if(d.type==="付与"){
+totalIssued+=d.points;
 }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-
-// 自分のFirebase設定に変更
-const firebaseConfig = {
-
- apiKey: "AIzaSyDUpuvtfZfMomVqusriKbDSNBImPsIAI",
-
- authDomain: "retro-point.firebaseapp.com",
-
- projectId: "retro-point",
-
- storageBucket: "retro-point.firebasestorage.app",
-
- messagingSenderId: "522866694412",
-
- appId: "1:522866694412:web:47ae009c10fa2ae14707b1",
-
- measurementId: "G-M2YHLTNK2J"
-
-};
-
-
-const app = initializeApp(firebaseConfig);
-
-const db = getFirestore(app);
-
-
-let currentShop = null;
-
-let isAdmin = false;
-
-let chart = null;
-
-
-
-// ログイン処理
-window.login = async function(){
-
- const shopId =
- document.getElementById("shopId").value;
-
- const password =
- document.getElementById("password").value;
-
-
- if(!shopId || !password){
-
-  alert("入力してください");
-  return;
-
- }
-
-
- const shopRef =
- doc(db,"shops",shopId);
-
-
- const snap =
- await getDoc(shopRef);
-
-
- if(!snap.exists()){
-
-  alert("ショップ不存在");
-  return;
-
- }
-
-
- const data = snap.data();
-
-
- if(data.password !== password){
-
-  alert("パスワード違い");
-  return;
-
- }
-
-
- currentShop = shopId;
-
- isAdmin = (shopId === "admin");
-
-
- document.getElementById("dashboard").style.display="block";
-
- document.getElementById("loginStatus").innerHTML =
- "ログイン成功：" + data.name;
-
-
- loadTransactions();
-
+if(d.type==="利用"){
+totalUsed++;
 }
 
+if(!shopMap[d.shop]) shopMap[d.shop]={add:0,use:0};
+if(d.type==="付与") shopMap[d.shop].add+=d.points;
+if(d.type==="利用") shopMap[d.shop].use++;
 
+if(!fraudMap[d.userId]) fraudMap[d.userId]=[];
+fraudMap[d.userId].push(d.time);
+});
 
-// ポイント処理
-window.process = async function(type){
+usersSnap.forEach(docu=>{
+let u=docu.data();
+if(u.surveyData){
+areaCount++;
+if(u.surveyData.area==="洲本市") sumotoCount++;
+let age=u.surveyData.age;
+if(!ageMap[age]) ageMap[age]=0;
+ageMap[age]++;
+}
+});
 
- if(!currentShop){
+document.getElementById("totalUsers").innerText=totalUsers;
+document.getElementById("totalIssued").innerText=totalIssued;
+document.getElementById("totalUsed").innerText=totalUsed;
+document.getElementById("sumotoRate").innerText=
+Math.round((sumotoCount/areaCount)*100)+"%";
 
-  alert("ログイン必要");
-  return;
+/* 年代グラフ */
+new Chart(document.getElementById("ageChart"),{
+type:"pie",
+data:{
+labels:Object.keys(ageMap),
+datasets:[{data:Object.values(ageMap)}]
+}
+});
 
- }
+/* 店舗表 */
+let table="";
+for(let shop in shopMap){
+table+=`<tr><td>${shop}</td><td>${shopMap[shop].add}</td><td>${shopMap[shop].use}</td></tr>`;
+}
+document.getElementById("shopTable").innerHTML=table;
 
-
- const uid =
- document.getElementById("uid").value;
-
-
- const pts =
- Number(
- document.getElementById("points").value
- ) || 0;
-
-
- if(!uid || pts === 0){
-
-  alert("入力必須");
-  return;
-
- }
-
-
- const userRef =
- doc(db,"users",uid);
-
-
- const snap =
- await getDoc(userRef);
-
-
- let current = 0;
-
-
- if(!snap.exists()){
-
-  await setDoc(userRef,{
-   points:0
-  });
-
- }else{
-
-  current =
-  Number(snap.data().points) || 0;
-
- }
-
-
- let newPoints = current;
-
-
- if(type==="add")
- newPoints += pts;
-
-
- if(type==="use")
- newPoints -= pts;
-
-
- if(type==="add_cancel")
- newPoints -= pts;
-
-
- if(type==="use_cancel")
- newPoints += pts;
-
-
- await updateDoc(userRef,{
-  points:newPoints
- });
-
-
- await addDoc(
- collection(db,"transactions"),
- {
-
-  userId:uid,
-
-  shopId:currentShop,
-
-  type:type,
-
-  points:pts,
-
-  createdAt:serverTimestamp()
-
- }
- );
-
-
- alert("完了：" + newPoints + "ポイント");
-
-
- loadTransactions();
-
+/* 不正検知 */
+let fraudHTML="";
+for(let user in fraudMap){
+let times=fraudMap[user].sort();
+for(let i=1;i<times.length;i++){
+if(times[i]-times[i-1]<60000){
+fraudHTML+=`<div class="alert">短時間連続付与：${user}</div>`;
+break;
+}
+}
+}
+document.getElementById("fraudArea").innerHTML=fraudHTML||"異常なし";
 }
 
-
-
-// 履歴読み込み
-async function loadTransactions(){
-
- if(!currentShop) return;
-
-
- let q;
-
-
- if(isAdmin){
-
-  q = query(
-   collection(db,"transactions")
-  );
-
- }else{
-
-  q = query(
-   collection(db,"transactions"),
-   where("shopId","==",currentShop)
-  );
-
- }
-
-
- const typeFilter =
- document.getElementById("filterType").value;
-
-
- if(typeFilter){
-
-  q = query(
-   collection(db,"transactions"),
-   where("shopId","==",currentShop),
-   where("type","==",typeFilter)
-  );
-
- }
-
-
- const snap =
- await getDocs(q);
-
-
- let html = "";
-
- let total = 0;
-
-
- snap.forEach(doc=>{
-
-  const d = doc.data();
-
-  const pts =
-  Number(d.points) || 0;
-
-
-  total += pts;
-
-
-  html += `
-  <div style="
-  padding:8px;
-  border-bottom:1px solid #eee;">
-  ${d.type}
-  ：${pts}ポイント
-  </div>
-  `;
-
- });
-
-
- document.getElementById("log").innerHTML =
- html;
-
-
- updateChart(total);
-
+/* コード照合 */
+window.checkCode=async function(){
+let code=document.getElementById("codeInput").value;
+const logsSnap=await getDocs(collection(db,"logs"));
+let found=null;
+logsSnap.forEach(d=>{
+if(d.data().useNo==code) found=d;
+});
+if(!found){
+document.getElementById("codeResult").innerText="無効コード";
+}else{
+await updateDoc(doc(db,"logs",found.id),{verified:true});
+document.getElementById("codeResult").innerText="有効・確認済みに更新";
+}
 }
 
-
-
-// グラフ更新
-function updateChart(total){
-
- const ctx =
- document.getElementById("chart");
-
-
- if(chart)
- chart.destroy();
-
-
- chart = new Chart(ctx,{
-
-  type:"bar",
-
-  data:{
-
-   labels:["合計ポイント"],
-
-   datasets:[{
-
-    label:"ポイント",
-
-    data:[total]
-
-   }]
-
-  }
-
- });
-
-}
-
-
+loadDashboard();
 </script>
-
 </body>
 </html>
