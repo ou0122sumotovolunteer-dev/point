@@ -302,8 +302,6 @@ await getDoc(ref);
 const current =
 Number(snap.data()?.points) || 0;
 
-
-// 🔒 12時間制限チェック
 const twelveHours =
 12 * 60 * 60 * 1000;
 
@@ -324,14 +322,11 @@ await getDocs(q);
 let blocked = false;
 
 logSnap.forEach(doc=>{
-
  const time =
  Number(doc.data().time) || 0;
-
  if(now - time < twelveHours){
   blocked = true;
  }
-
 });
 
 if(blocked){
@@ -339,29 +334,33 @@ if(blocked){
  return;
 }
 
-
-// ポイント付与
+/* 付与 */
 await updateDoc(ref,{
  points: current + add
 });
 
-
 await addDoc(collection(db,"logs"),{
-
  userId: userId,
-
  type: "add",
-
  shop: shopId,
-
  points: add,
-
  time: now
-
 });
 
+/* 完了画面 */
+const timeStr =
+new Date(now).toLocaleString();
 
-location.href = location.origin;
+document.getElementById("app").innerHTML=`
+<div class="card">
+<h2>ポイント付与完了</h2>
+<p><strong>${shops[shopId]}</strong></p>
+<p>${timeStr}</p>
+<p><span style="font-size:28px;color:#c05a2b;">＋${add} ポイント</span></p>
+<br>
+<button onclick="location.href=location.origin">ホームへ戻る</button>
+</div>
+`;
 
 };
 
@@ -374,7 +373,9 @@ return;
 }
 document.getElementById("app").innerHTML=`
 <div class="card">
-<button onclick="usePoints()">3ポイント利用</button>
+<h2>${shops[shopId]}</h2>
+<p>3ポイント利用します</p>
+<button onclick="confirmUse()">利用する</button>
 </div>`;
 }
 
@@ -387,6 +388,57 @@ userId,type:"use",shop:shopId,time:Date.now()
 });
 location.href=location.origin;
 };
+
+window.confirmUse=function(){
+if(!confirm("本当に利用しますか？")){
+ return;
+}
+if(!confirm("再確認：3ポイント消費します。よろしいですか？")){
+ return;
+}
+usePoints();
+};
+
+async function usePoints(){
+
+const ref=doc(db,"users",userId);
+const snap=await getDoc(ref);
+
+await updateDoc(ref,{
+ points:snap.data().points-3
+});
+
+const now=Date.now();
+const code=
+Math.random().toString(36)
+.substring(2,8)
+.toUpperCase();
+
+await addDoc(collection(db,"logs"),{
+ userId:userId,
+ type:"use",
+ shop:shopId,
+ time:now,
+ useCode:code
+});
+
+const timeStr=
+new Date(now).toLocaleString();
+
+document.getElementById("app").innerHTML=`
+<div class="card">
+<h2>利用完了</h2>
+<p><strong>${shops[shopId]}</strong></p>
+<p>${timeStr}</p>
+<p>－3ポイント</p>
+<div class="code">${code}</div>
+<p style="font-size:12px;">※店舗へこのコードを提示してください</p>
+<br>
+<button onclick="location.href=location.origin">ホームへ戻る</button>
+</div>
+`;
+
+}
 
 /* 管理ログイン */
 window.showAdminLogin=function(){
