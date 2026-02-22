@@ -61,7 +61,15 @@ td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getFirestore, collection, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-const firebaseConfig={/* 同じ設定 */};
+const firebaseConfig = {
+  apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
+  authDomain: "retro-point.firebaseapp.com",
+  projectId: "retro-point",
+  storageBucket: "retro-point.firebasestorage.app",
+  messagingSenderId: "522866949412",
+  appId: "1:522866949412:web:47ae009c10fa2ae14707b1",
+  measurementId: "G-M2YHLTNK2J"
+};
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
