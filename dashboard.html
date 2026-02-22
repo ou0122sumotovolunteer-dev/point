@@ -32,14 +32,32 @@ h2{
   margin-top:0;
 }
 .stat{
-  font-size:22px;
-  margin:10px 0;
+  font-size:20px;
+  margin:8px 0;
 }
 .historyItem{
   font-size:13px;
   margin:6px 0;
   border-bottom:1px solid #eee;
   padding-bottom:4px;
+}
+input{
+  padding:10px;
+  border-radius:8px;
+  width:80%;
+}
+button{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#c05a2b;
+  color:white;
+  cursor:pointer;
+  margin-top:8px;
+}
+.result{
+  margin-top:10px;
+  font-weight:bold;
 }
 </style>
 </head>
@@ -48,11 +66,19 @@ h2{
 <div id="app"></div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import {
-  getFirestore, collection, getDocs, query, where
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
+
+/* Firebase設定 */
 const firebaseConfig = {
   apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
   authDomain: "retro-point.firebaseapp.com",
@@ -65,6 +91,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+
+/* 店舗一覧 */
 const shops = {
   shop01: "ほたるの宿",
   shop02: "たこたこ",
@@ -93,6 +121,8 @@ const shops = {
   shop25: "coffe and bake stand pegasus"
 };
 
+
+/* URLから店舗取得 */
 const params = new URLSearchParams(location.search);
 const shopId = params.get("shop");
 
@@ -103,6 +133,8 @@ if(!shopId || !shops[shopId]){
   loadDashboard();
 }
 
+
+/* ダッシュボード読み込み */
 async function loadDashboard(){
 
   const q = query(
@@ -116,8 +148,8 @@ async function loadDashboard(){
   let totalUse = 0;
   let historyHTML = "";
 
-  snap.forEach(doc=>{
-    const d = doc.data();
+  snap.forEach(docu=>{
+    const d = docu.data();
 
     if(d.type === "add"){
       totalAdd += d.points || 0;
@@ -133,7 +165,7 @@ async function loadDashboard(){
 
     historyHTML += `
       <div class="historyItem">
-      ${d.type === "add" ? "＋" + d.points + "P" : "－3P"}
+      ${d.type === "add" ? "＋" + (d.points || 0) + "P" : "－3P"}
       (${time})
       </div>
     `;
@@ -145,19 +177,95 @@ async function loadDashboard(){
   </div>
 
   <div class="section">
+
     <div class="card">
-      <h2>統計</h2>
+      <h2>📊 統計</h2>
       <div class="stat">総付与ポイント：${totalAdd} P</div>
       <div class="stat">総利用回数：${totalUse} 回</div>
     </div>
 
     <div class="card">
-      <h2>履歴</h2>
+      <h2>🧾 利用コード照合</h2>
+      <input type="text" id="checkCodeInput" placeholder="コード入力">
+      <br>
+      <button onclick="checkUseCode()">照合する</button>
+      <div id="checkResult" class="result"></div>
+    </div>
+
+    <div class="card">
+      <h2>📜 履歴</h2>
       ${historyHTML || "履歴なし"}
     </div>
+
   </div>
   `;
 }
+
+
+/* コード照合 */
+window.checkUseCode = async function(){
+
+  const code =
+  document.getElementById("checkCodeInput")
+  .value
+  .trim()
+  .toUpperCase();
+
+  if(!code){
+    alert("コードを入力してください");
+    return;
+  }
+
+  const q = query(
+    collection(db,"logs"),
+    where("shop","==",shopId),
+    where("type","==","use"),
+    where("useCode","==",code)
+  );
+
+  const snap = await getDocs(q);
+
+  if(snap.empty){
+    document.getElementById("checkResult").innerHTML =
+    "<span style='color:red;'>❌ 無効なコード</span>";
+    return;
+  }
+
+  let docRef;
+  let alreadyUsed = false;
+
+  snap.forEach(docu=>{
+    docRef = docu.ref;
+    const d = docu.data();
+    if(d.usedConfirmed){
+      alreadyUsed = true;
+    }
+  });
+
+  if(alreadyUsed){
+    document.getElementById("checkResult").innerHTML =
+    "<span style='color:orange;'>⚠ すでに使用済み</span>";
+  }else{
+    window._currentCodeRef = docRef;
+    document.getElementById("checkResult").innerHTML =
+    "<span style='color:green;'>✅ 有効なコード</span><br><button onclick='confirmUseCode()'>使用確定</button>";
+  }
+};
+
+
+/* 使用確定 */
+window.confirmUseCode = async function(){
+
+  if(!window._currentCodeRef) return;
+
+  await updateDoc(window._currentCodeRef,{
+    usedConfirmed: true
+  });
+
+  document.getElementById("checkResult").innerHTML =
+  "<span style='color:blue;'>✔ 使用確定しました</span>";
+};
+
 </script>
 
 </body>
