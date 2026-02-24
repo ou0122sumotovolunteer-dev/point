@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レトロこみち ポイント</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+<style>
+body{margin:0;font-family:sans-serif;background:#f2f2f7;}
+.header{background:#8b5e3c;color:white;padding:15px;font-weight:bold;}
+.card{background:white;margin:20px;padding:20px;border-radius:15px;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+.point{font-size:42px;font-weight:bold;margin-top:10px;}
+button{padding:10px 16px;border:none;border-radius:8px;
+background:#8b5e3c;color:white;margin-top:10px;cursor:pointer;}
+input,select{padding:8px;width:95%;margin-top:8px;}
+.history{font-size:14px;border-bottom:1px solid #eee;padding:6px 0;}
+.center{text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="header">レトロこみち ポイント</div>
+<div id="app"></div>
+
+<script>
+// ================= Firebase =================
+var firebaseConfig = {
+  apiKey: "AIzaSyDUpuvtfZfMormV9qusrkibD5NBImPsIAI",
+  authDomain: "retro-point.firebaseapp.com",
+  projectId: "retro-point"
+};
+firebase.initializeApp(firebaseConfig);
+var db = firebase.firestore();
+
+var STAFF_CODE="RETRO2024";
+
+// ================= ユーザーID =================
+var userId = localStorage.getItem("retroUserId");
+if(!userId){
+  userId = Math.random().toString(36).substring(2);
+  localStorage.setItem("retroUserId", userId);
+}
+
+var params = new URLSearchParams(location.search);
+var mode = params.get("mode");
+var shop = params.get("shop");
+
+// ================= 初期化 =================
+db.collection("users").doc(userId).get().then(function(doc){
+  if(!doc.exists){
+    db.collection("users").doc(userId).set({
+      points:0,
+      status:"active"
+    }).then(route);
+  }else{
+    route();
+  }
+});
+
+// ================= ルーティング =================
+function route(){
+  if(mode==="grant" && shop){ renderGrant(); return; }
+  if(mode==="use"){ renderUse(); return; }
+  if(mode==="admin"){ renderAdminLogin(); return; }
+
+  db.collection("users").doc(userId).get().then(function(doc){
+    var data=doc.data();
+    if(!data.survey){
+      renderSurvey();
+    }else{
+      renderHome();
+    }
+  });
+}
+
+// ================= アンケート =================
+function renderSurvey(){
+  document.getElementById("app").innerHTML=`
+  <div class="card">
+    <h3>初回アンケート</h3>
+    ニックネーム<input id="nickname">
+    年代
+    <select id="age">
+      <option>10代</option>
+      <option>20代</option>
+      <option>30代</option>
+      <option>40代</option>
+      <option>50代以上</option>
+    </select>
+    地域
+    <select id="area">
+      <option>洲本市</option>
+      <option>淡路市</option>
+      <option>南あわじ市</option>
+      <option>その他</option>
+    </select>
+    性別
+    <select id="gender">
+      <option>男性</option>
+      <option>女性</option>
+      <option>その他</option>
+    </select>
+    <button onclick="saveSurvey()">登録</button>
+  </div>`;
+}
+
+function saveSurvey(){
+  var nickname=document.getElementById("nickname").value.trim();
+  if(!nickname){ alert("ニックネーム必須"); return; }
+
+  db.collection("users").doc(userId).update({
+    survey:{
+      nickname:nickname,
+      age:document.getElementById("age").value,
+      area:document.getElementById("area").value,
+      gender:document.getElementById("gender").value
+    }
+  }).then(renderHome);
+}
+
+// ================= ホーム =================
+function renderHome(){
+  db.collection("users").doc(userId).get().then(function(doc){
+    var data=doc.data();
+
+    if(data.status==="stopped"){
+      document.getElementById("app").innerHTML=
+      `<div class="card">利用停止中です</div>`;
+      return;
+    }
+
+    db.collection("logs")
+      .where("userId","==",userId)
+      .orderBy("time","desc")
+      .limit(5)
+      .get()
+      .then(function(snapshot){
+
+        var historyHTML="";
+        snapshot.forEach(function(d){
+          var l=d.data();
+          historyHTML+=`<div class="history">
+          ${l.type==="add"?"＋":"－"}${l.points}P
+          </div>`;
+        });
+
+        document.getElementById("app").innerHTML=`
+        <div class="card center">
+          <div>${data.survey.nickname} さん</div>
+          <div class="point">${data.points}P</div>
+        </div>
+
+        <div class="card center">
+          <h3>マイQRコード</h3>
+          <div id="qrArea"></div>
+          <button onclick="generateQR()">QR生成（5分有効）</button>
+        </div>
+
+        <div class="card">
+          <h3>履歴</h3>
+          ${historyHTML||"履歴なし"}
+        </div>
+
+        <div class="card center">
+          <button onclick="location.href='?mode=admin'">管理</button>
+        </div>`;
+      });
+  });
+}
+
+// ================= QR =================
+function generateQR(){
+  var area=document.getElementById("qrArea");
+  area.innerHTML="";
+  var expire=Date.now()+5*60*1000;
+  var payload=JSON.stringify({uid:userId,exp:expire});
+  var canvas=document.createElement("canvas");
+  area.appendChild(canvas);
+  QRCode.toCanvas(canvas,payload);
+}
+
+// ================= 付与 =================
+function renderGrant(){
+  var ref=db.collection("users").doc(userId);
+  ref.get().then(function(doc){
+    var data=doc.data();
+
+    db.collection("logs")
+      .where("userId","==",userId)
+      .where("shop","==",shop)
+      .where("type","==","add")
+      .orderBy("time","desc")
+      .limit(1)
+      .get()
+      .then(function(snap){
+
+        if(!snap.empty){
+          var last=snap.docs[0].data().time.toMillis();
+          if(Date.now()-last<12*60*60*1000){
+            alert("この店舗では12時間以内は付与不可");
+            location.href="index.html";
+            return;
+          }
+        }
+
+        ref.update({points:data.points+3});
+        db.collection("logs").add({
+          userId:userId,
+          type:"add",
+          points:3,
+          shop:shop,
+          time:firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        document.getElementById("app").innerHTML=
+        `<div class="card center">
+        <h2>付与完了</h2>
+        <button onclick="goHome()">ホーム</button>
+        </div>`;
+      });
+  });
+}
+
+// ================= 利用 =================
+function renderUse(){
+  var ref=db.collection("users").doc(userId);
+  ref.get().then(function(doc){
+    var data=doc.data();
+
+    if(data.points<3){
+      document.getElementById("app").innerHTML=
+      `<div class="card">ポイント不足</div>`;
+      return;
+    }
+
+    ref.update({points:data.points-3});
+    var code=Math.random().toString(36).substring(2,8).toUpperCase();
+
+    db.collection("logs").add({
+      userId:userId,
+      type:"use",
+      points:3,
+      useCode:code,
+      time:firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    document.getElementById("app").innerHTML=
+    `<div class="card center">
+      <h2>利用完了</h2>
+      <div style="font-size:28px;margin:20px 0;">${code}</div>
+      <button onclick="goHome()">ホーム</button>
+    </div>`;
+  });
+}
+
+// ================= 管理 =================
+function renderAdminLogin(){
+  document.getElementById("app").innerHTML=
+  `<div class="card center">
+    <input type="password" id="code" placeholder="管理コード">
+    <button onclick="checkAdmin()">ログイン</button>
+  </div>`;
+}
+
+function checkAdmin(){
+  if(document.getElementById("code").value===STAFF_CODE){
+    renderAdminPanel();
+  }else alert("コード違い");
+}
+
+function renderAdminPanel(){
+  db.collection("users").get().then(function(snapshot){
+    var html="";
+    snapshot.forEach(function(d){
+      var u=d.data();
+      html+=`
+      <div class="card">
+        ${u.survey?u.survey.nickname:"未登録"}<br>
+        ${u.points}P<br>
+        状態：${u.status}<br>
+        <button onclick="adminGrant('${d.id}')">+3P</button>
+        <button onclick="toggleStop('${d.id}','${u.status}')">
+        ${u.status==="stopped"?"再開":"停止"}
+        </button>
+      </div>`;
+    });
+    html+=`<button onclick="goHome()">戻る</button>`;
+    document.getElementById("app").innerHTML=html;
+  });
+}
+
+function adminGrant(uid){
+  var ref=db.collection("users").doc(uid);
+  ref.get().then(function(doc){
+    var p=doc.data().points;
+    ref.update({points:p+3}).then(renderAdminPanel);
+  });
+}
+
+function toggleStop(uid,status){
+  db.collection("users").doc(uid)
+  .update({status:status==="stopped"?"active":"stopped"})
+  .then(renderAdminPanel);
+}
+
+function goHome(){
+  location.href="index.html";
+}
+</script>
+
+</body>
+</html>
